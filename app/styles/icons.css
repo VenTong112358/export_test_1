@@ -1,0 +1,28 @@
+/* Web Icon Fallbacks */
+.icon-arrow-back::before { content: "←"; }
+.icon-menu::before { content: "☰"; }
+.icon-notifications::before { content: "🔔"; }
+.icon-person::before { content: "👤"; }
+.icon-calendar::before { content: "📅"; }
+.icon-log-out::before { content: "🚪"; }
+.icon-chevron-forward::before { content: "▶"; }
+.icon-volume-high::before { content: "🔊"; }
+.icon-close::before { content: "✕"; }
+.icon-checkmark-circle::before { content: "✓"; }
+.icon-book::before { content: "📖"; }
+.icon-home::before { content: "🏠"; }
+.icon-star::before { content: "★"; }
+.icon-chevron-up::before { content: "▲"; }
+.icon-chevron-down::before { content: "▼"; }
+.icon-heart::before { content: "♥"; }
+.icon-language::before { content: "🌐"; }
+.icon-analytics::before { content: "📊"; }
+.icon-copy::before { content: "📋"; }
+.icon-time::before { content: "⏰"; }
+
+/* Fallback icon styles */
+.icon-fallback {
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  font-size: inherit;
+  line-height: 1;
+} 
