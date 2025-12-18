@@ -1,9 +1,11 @@
-import React, { useState } from 'react';
-import { View, StyleSheet, ScrollView, Dimensions, Platform } from 'react-native';
-import { TextInput, Button, Text, Checkbox } from 'react-native-paper';
-import { useRouter } from 'expo-router';
+import { PrivacyPolicyModal } from '@/app/components/PrivacyPolicyModal';
 import { SmsApi } from '@data/api/SmsApi';
+import { usePrivacyPolicyAgreement } from '@hooks/usePrivacyPolicyAgreement';
 import { useTheme } from '@hooks/useTheme';
+import { useRouter } from 'expo-router';
+import { useEffect, useState } from 'react';
+import { Dimensions, Linking, Platform, ScrollView, StyleSheet, TouchableOpacity, View } from 'react-native';
+import { Button, Checkbox, Text, TextInput } from 'react-native-paper';
 
 const { width, height } = Dimensions.get('window');
 
@@ -17,10 +19,19 @@ export default function RegisterScreen() {
   const [acceptedTerms, setAcceptedTerms] = useState(false);
   const [formError, setFormError] = useState('');
   const [smsLoading, setSmsLoading] = useState(false);
+  const [showPrivacyModal, setShowPrivacyModal] = useState(false);
   
   const { theme } = useTheme();
   const router = useRouter();
   const smsApi = SmsApi.getInstance();
+  const { hasAccepted: privacyPolicyAccepted, isLoading: privacyPolicyLoading, acceptPrivacyPolicy } = usePrivacyPolicyAgreement();
+
+  // Show privacy policy modal on first app use
+  useEffect(() => {
+    if (!privacyPolicyLoading && privacyPolicyAccepted === false) {
+      setShowPrivacyModal(true);
+    }
+  }, [privacyPolicyLoading, privacyPolicyAccepted]);
 
   const validatePhoneNumber = (phone: string) => {
     const phoneRegex = /^1[3-9]\d{9}$/;
@@ -29,6 +40,16 @@ export default function RegisterScreen() {
 
   const validatePassword = (pass: string) => {
     return pass.length >= 8 && /[A-Za-z]/.test(pass) && /[0-9]/.test(pass);
+  };
+
+  const handleAcceptPrivacyPolicy = async () => {
+    try {
+      await acceptPrivacyPolicy();
+      setShowPrivacyModal(false);
+    } catch (error) {
+      console.error('Error accepting privacy policy:', error);
+      setFormError('无法保存隐私政策同意状态，请重试');
+    }
   };
 
   const handleSmsRegister = async () => {
@@ -84,8 +105,13 @@ export default function RegisterScreen() {
   };
 
   return (
-    <ScrollView contentContainerStyle={[styles.container, { backgroundColor: theme.colors.background }]}> 
-      <View style={styles.content}>
+    <>
+      <PrivacyPolicyModal 
+        visible={showPrivacyModal} 
+        onAccept={handleAcceptPrivacyPolicy}
+      />
+      <ScrollView contentContainerStyle={[styles.container, { backgroundColor: theme.colors.background }]}> 
+        <View style={styles.content}>
         {/* Title Section */}
         <View style={styles.titleSection}>
           <Text style={styles.title}>注册</Text>
@@ -175,7 +201,9 @@ export default function RegisterScreen() {
             status={acceptedTerms ? 'checked' : 'unchecked'}
             onPress={() => setAcceptedTerms(!acceptedTerms)}
           />
-          <Text style={styles.termsText}>我已阅读并同意隐私政策</Text>
+          <TouchableOpacity onPress={() => Linking.openURL('https://masterwordai.com/%E5%85%B3%E4%BA%8E%E5%85%AC%E5%8F%B8-2')}>
+            <Text style={styles.termsText}>我已阅读并同意隐私政策</Text>
+          </TouchableOpacity>
         </View>
         {/* Register Button */}
         <Button
@@ -200,6 +228,7 @@ export default function RegisterScreen() {
         </Button>
       </View>
     </ScrollView>
+    </>
   );
 }
 
@@ -289,6 +318,7 @@ const styles = StyleSheet.create({
   },
   termsText: {
     marginLeft: 8,
-    color: '#838589',
+    color: '#0066CC',
+    textDecorationLine: 'underline',
   },
 });

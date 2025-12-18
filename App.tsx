@@ -10,7 +10,8 @@ import { darkTheme, lightTheme } from './constants/theme';
 
 // GestureHandlerRootView can ONLY be imported from 'react-native-gesture-handler' (no such export from 'react-native').
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
-
+import * as WeChat from 'react-native-wechat-lib';
+WeChat.registerApp('your-wechat-appid');
 
 // 在应用启动时清理损坏的数据
 const initializeApp = async () => {

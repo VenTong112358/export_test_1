@@ -1,16 +1,18 @@
-import { useAuth } from '@hooks/useAuth';
-import { useRouter, Slot } from 'expo-router';
-import { useSelector, Provider } from 'react-redux';
-import { RootState, store } from '@data/repository/store';
-import { useEffect, useState } from 'react';
-import { View, ActivityIndicator } from 'react-native';
-import { PaperProvider } from 'react-native-paper';
-import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { lightTheme } from '@constants/theme';
 import { HttpClient } from '@data/api/HttpClient';
+import { RootState, store } from '@data/repository/store';
+import { useAuth } from '@hooks/useAuth';
+import { usePrivacyPolicyAgreement } from '@hooks/usePrivacyPolicyAgreement';
+import { Slot, useRouter } from 'expo-router';
+import { useEffect, useState } from 'react';
+import { ActivityIndicator, View } from 'react-native';
+import { PaperProvider } from 'react-native-paper';
+import { SafeAreaProvider } from 'react-native-safe-area-context';
+import { Provider, useSelector } from 'react-redux';
 
 function AuthWrapper() {
   const { restoreAuthFromStorage, checkTokenValidity } = useAuth();
+  const { hasAccepted: privacyPolicyAccepted, isLoading: privacyPolicyLoading } = usePrivacyPolicyAgreement();
   const [isLoading, setIsLoading] = useState(true);
   const user = useSelector((state: RootState) => state.auth.user);
   const router = useRouter();
@@ -23,6 +25,11 @@ function AuthWrapper() {
     const checkAuthStatus = async () => {
       console.log('[AuthWrapper] Starting auth status check');
       try {
+        // Wait for privacy policy check to complete
+        if (privacyPolicyLoading) {
+          console.log('[AuthWrapper] Waiting for privacy policy check');
+          return;
+        }
         // 1. Restore auth state (user info)
         const hasStoredAuth = await restoreAuthFromStorage();
         // 2. Restore tokens from storage to HttpClient
@@ -43,10 +50,10 @@ function AuthWrapper() {
         setInitialCheckDone(true);
       }
     };
-    if (!initialCheckDone) {
+    if (!initialCheckDone && !privacyPolicyLoading) {
       checkAuthStatus();
     }
-  }, [initialCheckDone]);
+  }, [initialCheckDone, privacyPolicyLoading]);
 
   useEffect(() => {
     const httpClient = HttpClient.getInstance();
@@ -56,9 +63,11 @@ function AuthWrapper() {
       token: !!token,
       isLoading,
       hasChecked,
-      redirectPending
+      redirectPending,
+      privacyPolicyAccepted,
+      privacyPolicyLoading
     });
-    if (!isLoading && hasChecked && !redirectPending) {
+    if (!isLoading && hasChecked && !redirectPending && !privacyPolicyLoading && privacyPolicyAccepted !== null) {
       const now = Date.now();
       if (now - lastAuthCheck < 5000) {
         console.log('[AuthWrapper] Debouncing, skipping check');
@@ -71,15 +80,21 @@ function AuthWrapper() {
         return;
       }
       if (initialCheckDone && (!user || !token)) {
-        console.log('[AuthWrapper] Auth failed, preparing to redirect to login');
+        console.log('[AuthWrapper] Auth failed, preparing to redirect');
         setLastAuthCheck(now);
         setRedirectPending(true);
         setTimeout(() => {
           const currentUser = store.getState().auth.user;
           const currentToken = HttpClient.getInstance().getAccessToken();
           if (!currentUser || !currentToken) {
-            console.log('[AuthWrapper] After delay, still no auth info, redirecting');
-            router.replace('/(auth)/login');
+            // Check if it's the first time - if privacy policy not accepted, go to register
+            if (privacyPolicyAccepted === false) {
+              console.log('[AuthWrapper] After delay, first time user, redirecting to register');
+              router.replace('/(auth)/register');
+            } else {
+              console.log('[AuthWrapper] After delay, returning user, redirecting to login');
+              router.replace('/(auth)/login');
+            }
           } else {
             console.log('[AuthWrapper] After delay, auth info restored, canceling redirect');
           }
@@ -87,7 +102,7 @@ function AuthWrapper() {
         }, 3000);
       }
     }
-  }, [isLoading, hasChecked, user, initialCheckDone, lastAuthCheck, redirectPending]);
+  }, [isLoading, hasChecked, user, initialCheckDone, lastAuthCheck, redirectPending, privacyPolicyAccepted, privacyPolicyLoading]);
 
   if (isLoading) {
     return (

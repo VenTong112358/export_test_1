@@ -1,81 +1,69 @@
-import React, { useState, useEffect, useCallback, useRef } from 'react';
-import {
-  View,
-  Text,
-  StyleSheet,
-  ScrollView,
-  TouchableOpacity,
-  Dimensions,
-  Platform,
-  Modal,
-  Pressable,
-  Alert,
-  Animated,
-} from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useTheme } from '@hooks/useTheme';
-import { useRouter, useLocalSearchParams } from 'expo-router';
+import { useLocalSearchParams, useRouter } from 'expo-router';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
+import {
+  Alert,
+  Animated,
+  Dimensions,
+  Modal,
+  Platform,
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View,
+} from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { useDispatch, useSelector } from 'react-redux';
 // import { LongPressGestureHandler, State } from 'react-native-gesture-handler'; // 注释掉手势组件引入
-import { stemmer } from 'stemmer';
-import { TranslationApi } from '@data/api/TranslationApi';
+import { WordAnalysis } from '@data/api/ArticleApi';
 import { FavoriteApi } from '@data/api/FavoriteApi';
-import mod, { Audio } from 'expo-av';
+import { WordDefinitionApi } from '@data/api/WordDefinitionApi';
+import { AppDispatch, RootState } from '@data/repository/store';
 import {
+  ArticleSegment,
+  clearError,
+  finishReading,
   generateArticle,
-  generateArticleFromLog,
   generateArticleStreamFromLog,
-  translateWord,
+  setCurrentSegmentIndex,
   setDifficulty,
   setSelectedWord,
-  setCurrentSegmentIndex,
-  addSegment,
+  setSelectedWords,
   setSessionId,
-  clearError,
-  resetArticle,
-  finishReading,
-  setSelectedWords
+  translateWord
 } from '@data/usecase/ArticleUseCase';
-import {
-  searchWord,
-  searchWordEnglish,
-  setShowModal,
-  clearCurrentWord
-} from '@data/usecase/WordSearchUseCase';
-import {
-  getSentenceExplanation,
-  getSentenceTranslation,
-  getSentenceExplanationStream,
-  getSentenceTranslationStream,
-  setSelectedSentence,
-  setShowModal as setSentenceModal,
-  setModalPosition,
-  clearSelectedSentence
-} from '@data/usecase/SentenceTranslationUseCase';
 import { updateLogStatus } from '@data/usecase/DailyLearningLogsUseCase';
 import { fetchSavedArticles } from '@data/usecase/SavedArticlesUseCase';
-import { WordDefinitionApi } from '@data/api/WordDefinitionApi';
-import { RootState, AppDispatch } from '@data/repository/store';
-import { WordAnalysis } from '@data/api/ArticleApi';
-import { ArticleSegment } from '@data/usecase/ArticleUseCase';
+import {
+  getSentenceExplanationStream,
+  getSentenceTranslationStream
+} from '@data/usecase/SentenceTranslationUseCase';
+import {
+  clearCurrentWord,
+  searchWord,
+  searchWordEnglish,
+  setShowModal
+} from '@data/usecase/WordSearchUseCase';
+import { Audio } from 'expo-av';
+import { stemmer } from 'stemmer';
+import { SentenceSelectionModal } from './components/SentenceSelectionModal';
 import { useDailyLearningLog } from './hooks/useDailyLearningLog';
 import { useStreamingHighlighter } from './hooks/useStreamingHighlighter';
-import { SentenceSelectionModal } from './components/SentenceSelectionModal';
 // import { ArticleCacheService } from '@data/sqlite/Database';
 
 // Import sentence splitter hook
-import { useStreamingSentenceSplitter } from './hooks/useStreamingSentenceSplitter';
 import { SpeakApi } from '@data/api/SpeakApi';
+import { Header } from './components/Header';
+import { HeaderReadingControls } from './components/HeaderReadingControls';
+import { useStreamingSentenceSplitter } from './hooks/useStreamingSentenceSplitter';
 // Defer importing expo-av until needed to avoid runtime crashes with version mismatch
 let AudioModule: any = null;
 if (Platform.OS !== 'web') {
   AudioModule = require('expo-av').Audio;
 }
-import { Header } from './components/Header';
-import { ReadingControlsButton } from './components/ReadingControlsButton';
-import { HeaderReadingControls } from './components/HeaderReadingControls';
-import { API_CONFIG } from '@data/api/ApiConfig';
 // import { Dimensions } from 'react-native';
 const { width, height } = Dimensions.get('window');
 // Types
@@ -931,7 +919,7 @@ const PassageMainPage: React.FC<PassageMainProps> = ({
             // Fix condition: only trigger for words truly near bottom or with invalid measurements
           const isNearBottom = safeY + safeHeight > windowHeight - 50; // Only if word is within 50px of bottom
           const hasInvalidMeasurements = safeY === 0 || safeHeight === 0;
-          
+
           if (hasInvalidMeasurements || isNearBottom) {
             // Only show warning for words actually near bottom
             if (isNearBottom && !hasInvalidMeasurements) {
@@ -1486,6 +1474,7 @@ const PassageMainPage: React.FC<PassageMainProps> = ({
               <Text style={styles.articleTitle}>{log?.english_title || 'Article'}</Text>
               <Text style={styles.articleSubtitle}>{log?.chinese_title || ''}</Text>
               <View style={styles.titleSeparator} />
+              <Text style={styles.aiGeneratedLabel}>(AI生成)</Text>
             </View>
 
             {/* Article Content - 根据showTranslation状态显示原文或翻译 */}
@@ -2277,6 +2266,13 @@ const styles = StyleSheet.create({
     height: 2,
     backgroundColor: '#FC9B33',
     borderRadius: 1,
+  },
+  aiGeneratedLabel: {
+    fontSize: 12,
+    color: '#FF0000',
+    fontFamily: Platform.select({ ios: 'Inter', android: 'sans-serif' }),
+    marginTop: height * 0.01,
+    fontWeight: '500',
   },
   articleContent: {
     fontSize: 16,
