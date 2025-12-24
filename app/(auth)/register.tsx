@@ -4,7 +4,7 @@ import { usePrivacyPolicyAgreement } from '@hooks/usePrivacyPolicyAgreement';
 import { useTheme } from '@hooks/useTheme';
 import { useRouter } from 'expo-router';
 import { useEffect, useState } from 'react';
-import { Dimensions, Linking, Platform, ScrollView, StyleSheet, TouchableOpacity, View } from 'react-native';
+import { BackHandler, Dimensions, Linking, Platform, ScrollView, StyleSheet, TouchableOpacity, View } from 'react-native';
 import { Button, Checkbox, Text, TextInput } from 'react-native-paper';
 
 const { width, height } = Dimensions.get('window');
@@ -50,6 +50,12 @@ export default function RegisterScreen() {
       console.error('Error accepting privacy policy:', error);
       setFormError('无法保存隐私政策同意状态，请重试');
     }
+  };
+
+  const handleDeclinePrivacyPolicy = () => {
+    // User declined - exit the app
+    console.log('[Register] User declined privacy policy, exiting app');
+    BackHandler.exitApp();
   };
 
   const handleSmsRegister = async () => {
@@ -109,6 +115,7 @@ export default function RegisterScreen() {
       <PrivacyPolicyModal 
         visible={showPrivacyModal} 
         onAccept={handleAcceptPrivacyPolicy}
+        onDecline={handleDeclinePrivacyPolicy}
       />
       <ScrollView contentContainerStyle={[styles.container, { backgroundColor: theme.colors.background }]}> 
         <View style={styles.content}>

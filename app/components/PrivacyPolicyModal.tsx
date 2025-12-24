@@ -16,11 +16,13 @@ const { width, height } = Dimensions.get('window');
 interface PrivacyPolicyModalProps {
   visible: boolean;
   onAccept: () => void;
+  onDecline: () => void;
 }
 
 export const PrivacyPolicyModal: React.FC<PrivacyPolicyModalProps> = ({
   visible,
   onAccept,
+  onDecline,
 }) => {
   const handleOpenPrivacyPolicy = () => {
     Linking.openURL('https://masterwordai.com/%E5%85%B3%E4%BA%8E%E5%85%AC%E5%8F%B8-2');
@@ -65,15 +67,26 @@ export const PrivacyPolicyModal: React.FC<PrivacyPolicyModalProps> = ({
 
           {/* Action Buttons */}
           <View style={styles.buttonContainer}>
-            <Button
-              mode="contained"
-              onPress={onAccept}
-              style={styles.acceptButton}
-              contentStyle={styles.buttonContent}
-              labelStyle={styles.buttonLabel}
-            >
-              我同意隐私政策
-            </Button>
+            <View style={styles.buttonRow}>
+              <Button
+                mode="outlined"
+                onPress={onDecline}
+                style={[styles.declineButton, { flex: 1, marginRight: width * 0.02 }]}
+                contentStyle={styles.buttonContent}
+                labelStyle={styles.declineButtonLabel}
+              >
+                我拒绝
+              </Button>
+              <Button
+                mode="contained"
+                onPress={onAccept}
+                style={[styles.acceptButton, { flex: 1, marginLeft: width * 0.02 }]}
+                contentStyle={styles.buttonContent}
+                labelStyle={styles.buttonLabel}
+              >
+                我同意
+              </Button>
+            </View>
           </View>
         </View>
       </View>
@@ -152,6 +165,10 @@ const styles = StyleSheet.create({
     borderTopColor: '#E8E8E8',
     backgroundColor: '#FFFBF8',
   },
+  buttonRow: {
+    flexDirection: 'row',
+    gap: 12,
+  },
   acceptButton: {
     backgroundColor: '#FC9B33',
     borderRadius: 12,
@@ -161,11 +178,22 @@ const styles = StyleSheet.create({
     shadowRadius: 8,
     elevation: 5,
   },
+  declineButton: {
+    borderColor: '#838589',
+    borderWidth: 1,
+    borderRadius: 12,
+  },
   buttonContent: {
     paddingVertical: height * 0.015,
   },
   buttonLabel: {
     color: 'white',
+    fontSize: 16,
+    fontFamily: Platform.select({ ios: 'DM Sans', android: 'sans-serif' }),
+    fontWeight: '700',
+  },
+  declineButtonLabel: {
+    color: '#838589',
     fontSize: 16,
     fontFamily: Platform.select({ ios: 'DM Sans', android: 'sans-serif' }),
     fontWeight: '700',

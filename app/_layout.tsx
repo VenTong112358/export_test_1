@@ -87,14 +87,9 @@ function AuthWrapper() {
           const currentUser = store.getState().auth.user;
           const currentToken = HttpClient.getInstance().getAccessToken();
           if (!currentUser || !currentToken) {
-            // Check if it's the first time - if privacy policy not accepted, go to register
-            if (privacyPolicyAccepted === false) {
-              console.log('[AuthWrapper] After delay, first time user, redirecting to register');
-              router.replace('/(auth)/register');
-            } else {
-              console.log('[AuthWrapper] After delay, returning user, redirecting to login');
-              router.replace('/(auth)/login');
-            }
+            // Always go to register page first (default auth screen)
+            console.log('[AuthWrapper] After delay, redirecting to register');
+            router.replace('/(auth)/register');
           } else {
             console.log('[AuthWrapper] After delay, auth info restored, canceling redirect');
           }
