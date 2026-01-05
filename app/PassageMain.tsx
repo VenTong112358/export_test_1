@@ -121,12 +121,16 @@ const PassageMainPage: React.FC<PassageMainProps> = ({
 
   // Parse logId for fetching daily learning log
   const logId = sessionId ? parseInt(sessionId) : null;
-  const { log, newWords } = useDailyLearningLog(logId);
-
-
+  const { log, newWords, reviewedWords } = useDailyLearningLog(logId);
 
   // Extract word list from newWords for highlighting
   const newWordsList = newWords.map(word => word.word);
+  
+  // Extract word list from reviewedWords for highlighting
+  const reviewedWordsList = reviewedWords.map((word: { word: string }) => word.word);
+
+  // State for showing reviewed words highlight
+  const [showReviewedWords, setShowReviewedWords] = useState(false);
 
   // Debug: Log new words list
   // console.log('[PassageMain] New words list:', newWordsList);
@@ -144,7 +148,7 @@ const PassageMainPage: React.FC<PassageMainProps> = ({
     buffer,
     debugWordMatching,
     processTextWithHighlights // Added this line
-  } = useStreamingHighlighter(newWordsList);
+  } = useStreamingHighlighter(newWordsList, reviewedWordsList, showReviewedWords);
 
   // Initialize sentence splitter
   const {
@@ -547,6 +551,15 @@ const PassageMainPage: React.FC<PassageMainProps> = ({
     console.log('[PassageMain] Translation mode switched to:', newMode ? 'English' : 'Chinese');
   }, [isEnglishTranslationMode]);
 
+  // Handle reviewed words toggle
+  const handleReviewedWordsToggle = useCallback(() => {
+    setShowReviewedWords(prev => {
+      const newValue = !prev;
+      console.log('[PassageMain] Reviewed words toggle:', newValue ? 'show' : 'hide');
+      return newValue;
+    });
+  }, []);
+
   // Handle sentence modal close
   const handleSentenceModalClose = useCallback(() => {
     setShowSentenceModal(false);
@@ -840,27 +853,41 @@ const PassageMainPage: React.FC<PassageMainProps> = ({
     checkmarkScale.setValue(0);
 
     // Enhanced word matching using Porter Stemmer
+    // Search in both newWords and reviewedWords
     const findMatchingWord = (targetWord: string) => {
       const cleanTargetWord = targetWord.toLowerCase().replace(/[^\w]/g, '');
       const targetStem = stemmer(cleanTargetWord);
-      // console.log('[WordDefinition] Target word:', cleanTargetWord, 'Stem:', targetStem);
+      
+      // Helper function to check if a word matches
+      const checkWordMatch = (word: { word: string }) => {
+        const cleanWord = word.word.toLowerCase().replace(/[^\w]/g, '');
+        if (cleanTargetWord === cleanWord) {
+          return true; // Exact match
+        }
+        const wordStem = stemmer(cleanWord);
+        if (targetStem === wordStem && targetStem.length > 2) {
+          return true; // Stem match
+        }
+        if (cleanTargetWord.startsWith(wordStem) || wordStem.startsWith(targetStem)) {
+          return true; // Prefix match
+        }
+        return false;
+      };
+      
+      // First, search in newWords
       for (const newWord of newWords) {
-        const cleanNewWord = newWord.word.toLowerCase().replace(/[^\w]/g, '');
-        // console.log('[WordDefinition] Comparing with:', cleanNewWord);
-        if (cleanTargetWord === cleanNewWord) {
-          // console.log('[WordDefinition] Exact match found');
-          return newWord;
-        }
-        const newWordStem = stemmer(cleanNewWord);
-        if (targetStem === newWordStem && targetStem.length > 2) {
-          // console.log('[WordDefinition] Stem match found');
-          return newWord;
-        }
-        if (cleanTargetWord.startsWith(newWordStem) || newWordStem.startsWith(targetStem)) {
-          // console.log('[WordDefinition] Prefix match found');
+        if (checkWordMatch(newWord)) {
           return newWord;
         }
       }
+      
+      // Then, search in reviewedWords
+      for (const reviewedWord of reviewedWords) {
+        if (checkWordMatch(reviewedWord)) {
+          return reviewedWord;
+        }
+      }
+      
       return null;
     };
 
@@ -969,7 +996,7 @@ const PassageMainPage: React.FC<PassageMainProps> = ({
       console.log('[WordDefinition] API error:', error);
       Alert.alert('Failed to load word definition');
     }
-  }, [newWords, checkmarkScale, setWordModalPosition, setShowWordDefinitionModal, setWordDefinition, setWordOptions, setWordDefinitionCorrect, setShowCorrectAnswer, setShowCheckmark, setShowWordDetails, setCurrentWordText, setCurrentWordPhonetic]);
+  }, [newWords, reviewedWords, checkmarkScale, setWordModalPosition, setShowWordDefinitionModal, setWordDefinition, setWordOptions, setWordDefinitionCorrect, setShowCorrectAnswer, setShowCheckmark, setShowWordDetails, setCurrentWordText, setCurrentWordPhonetic]);
 
   const handleLongPress = useCallback((text: string) => {
     setSelectedText(text);
@@ -1225,14 +1252,20 @@ const PassageMainPage: React.FC<PassageMainProps> = ({
                 styles.sentenceText,
                 { fontSize, lineHeight: lineHeight * fontSize },
                 segment.isHighlighted && styles.streamingWordHighlight,
+                segment.isReviewed && showReviewedWords && styles.reviewedWordHighlight,
                 isWordQueried(segment.text) && styles.queriedWordUnderline,
               ]}
               onPress={() => {
                 if (!/^[a-zA-Z]+$/.test(clean)) return;
                 const wa = { text: clean, type: 'known', difficulty: 'medium', frequency: 1 } as WordAnalysis;
-                segment.isHighlighted
-                  ? handleWordDefinition(segment.text, key)
-                  : handleWordPress(wa, key);
+                // If it's a reviewed word (green highlight), show definition directly (not quiz)
+                if (segment.isReviewed && showReviewedWords) {
+                  handleWordPress(wa, key);
+                } else if (segment.isHighlighted) {
+                  handleWordDefinition(segment.text, key);
+                } else {
+                  handleWordPress(wa, key);
+                }
               }}
             >
               {segment.text}
@@ -1309,10 +1342,23 @@ const PassageMainPage: React.FC<PassageMainProps> = ({
             styles.sentenceText,
             { fontSize, lineHeight: lineHeight * fontSize },
             segment.isHighlighted && styles.streamingWordHighlight,
+            segment.isReviewed && showReviewedWords && styles.reviewedWordHighlight,
             isWordQueried(segment.text) && styles.queriedWordUnderline
           ]}
           onPress={() => {
-            if (!segment.isHighlighted) {
+            // If it's a reviewed word (green highlight), show definition directly (not quiz)
+            if (segment.isReviewed && showReviewedWords) {
+              if (cleanWord.length > 0 && /^[a-zA-Z]+$/.test(cleanWord)) {
+                const wordAnalysis: WordAnalysis = {
+                  text: cleanWord,
+                  type: 'known',
+                  difficulty: 'medium',
+                  frequency: 1
+                };
+                // Pass the unique key to handleWordPress to show definition directly
+                handleWordPress(wordAnalysis, uniqueWordKey);
+              }
+            } else if (!segment.isHighlighted) {
               if (cleanWord.length > 0 && /^[a-zA-Z]+$/.test(cleanWord)) {
                 const wordAnalysis: WordAnalysis = {
                   text: cleanWord,
@@ -1440,6 +1486,7 @@ const PassageMainPage: React.FC<PassageMainProps> = ({
             onLineHeightChange={handleLineHeightChange}
             onTranslationToggle={handleTranslationToggle}
             onFavoriteToggle={handleFavoriteToggle}
+            onReviewedWordsToggle={handleReviewedWordsToggle}
           />
         }
       />
@@ -2413,6 +2460,9 @@ const styles = StyleSheet.create({
     paddingVertical: 1,
     borderRadius: 4,
     fontWeight: '600',
+  },
+  reviewedWordHighlight: {
+    color: '#4CAF50',
   },
   learnedWord: {
     borderBottomWidth: 2,

@@ -38,6 +38,7 @@ export interface DailyLearningLog {
   chinese_title: string;
   outline: string;
   daily_new_words: DailyNewWord[];
+  daily_reviewed_words?: DailyNewWord[];
   additional_information?: AdditionalInformation;
   status?: 'unlearned' | 'learning' | 'learned';
 }

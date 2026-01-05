@@ -1,13 +1,15 @@
-import { configureStore } from '@reduxjs/toolkit';
-import { enableMapSet } from 'immer';
-import authReducer, { AuthState } from '@data/usecase/UserUseCase';
 import articleReducer, { ArticleState } from '@data/usecase/ArticleUseCase';
 import dailyLearningLogsReducer, { DailyLearningLogsState } from '@data/usecase/DailyLearningLogsUseCase';
-import wordSearchReducer, { WordSearchState } from '@data/usecase/WordSearchUseCase';
 import sentenceTranslationReducer, { SentenceTranslationState } from '@data/usecase/SentenceTranslationUseCase';
+import authReducer, { AuthState } from '@data/usecase/UserUseCase';
+import wordSearchReducer, { WordSearchState } from '@data/usecase/WordSearchUseCase';
+import { configureStore } from '@reduxjs/toolkit';
+import { enableMapSet } from 'immer';
 
-import sentenceFavoriteReducer, { SentenceFavoriteState } from '@data/usecase/SentenceFavouriteUseCase';
+import allArticlesReducer, { AllArticlesState } from '@data/usecase/AllArticlesUseCase';
 import savedArticlesReducer, { SavedArticlesState } from '@data/usecase/SavedArticlesUseCase';
+import sentenceFavoriteReducer, { SentenceFavoriteState } from '@data/usecase/SentenceFavouriteUseCase';
+import wordsWithCaijiReducer, { WordsWithCaijiState } from '@data/usecase/WordsWithCaijiUseCase';
 
 // 启用Immer的MapSet插件
 enableMapSet();
@@ -22,6 +24,8 @@ export const store = configureStore({
 
     sentenceFavorite: sentenceFavoriteReducer,
     savedArticles: savedArticlesReducer,
+    allArticles: allArticlesReducer,
+    wordsWithCaiji: wordsWithCaijiReducer,
   },
   middleware: (getDefaultMiddleware) =>
     getDefaultMiddleware({
@@ -38,6 +42,8 @@ export interface RootState {
 
   sentenceFavorite: SentenceFavoriteState;
   savedArticles: SavedArticlesState;
+  allArticles: AllArticlesState;
+  wordsWithCaiji: WordsWithCaijiState;
 }
 
 export type AppDispatch = typeof store.dispatch;

@@ -1,16 +1,16 @@
-import React, { useState, useEffect, useRef } from 'react';
+import { Ionicons } from '@expo/vector-icons';
+import React, { useEffect, useRef, useState } from 'react';
 import {
-  View,
-  TouchableOpacity,
-  StyleSheet,
-  Share,
   Alert,
-  Modal,
-  Text,
   Animated,
   Dimensions,
+  Share,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View
 } from 'react-native';
-import Svg, { Path, G, Defs, ClipPath, Rect, Mask } from 'react-native-svg';
+import Svg, { ClipPath, Defs, G, Mask, Path, Rect } from 'react-native-svg';
 import { TranslationToggle } from './TranslationToggle';
 
 // 自定义星形图标组件
@@ -125,6 +125,7 @@ interface HeaderReadingControlsProps {
   onLineHeightChange: (height: number) => void;
   onTranslationToggle: () => void;
   onFavoriteToggle: () => void;
+  onReviewedWordsToggle: () => void;
 }
 
 export const HeaderReadingControls: React.FC<HeaderReadingControlsProps> = ({
@@ -140,6 +141,7 @@ export const HeaderReadingControls: React.FC<HeaderReadingControlsProps> = ({
   onLineHeightChange,
   onTranslationToggle,
   onFavoriteToggle,
+  onReviewedWordsToggle,
 }) => {
   const [showFontModal, setShowFontModal] = useState(false);
   const [buttonLayout, setButtonLayout] = useState({ x: 0, y: 0, width: 0, height: 0 });
@@ -247,6 +249,14 @@ export const HeaderReadingControls: React.FC<HeaderReadingControlsProps> = ({
 
   return (
     <View style={styles.container}>
+      {/* Timer icon button - added next to font size button */}
+      <TouchableOpacity
+        style={styles.controlButton}
+        onPress={onReviewedWordsToggle}
+      >
+        <Ionicons name="timer-outline" size={25} color="#333" style={{ marginTop: 3 }} />
+      </TouchableOpacity>
+
       {/* 字体大小按钮 - 点击弹出选项窗口 */}
       <TouchableOpacity
         style={styles.controlButton} 

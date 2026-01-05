@@ -7,6 +7,7 @@ export interface LocalArticle {
   chineseTitle: string;
   date: string;
   newWords: LocalNewWord[];
+  reviewedWords?: LocalNewWord[];
   completedAt: string;
 }
 
@@ -44,7 +45,8 @@ export class LocalArticleStorage {
         id: article.id,
         logId: article.logId,
         title: article.englishTitle,
-        newWordsCount: article.newWords.length
+        newWordsCount: article.newWords.length,
+        reviewedWordsCount: article.reviewedWords?.length || 0
       });
 
       // 获取现有的文章列表

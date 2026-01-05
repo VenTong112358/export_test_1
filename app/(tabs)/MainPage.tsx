@@ -1,21 +1,19 @@
-import React, { useEffect, useState } from 'react';
-import { View, Text, StyleSheet, ScrollView, Image, TouchableOpacity, Dimensions, Platform, Modal } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
-import { Ionicons } from '@expo/vector-icons';
-import { useTheme } from '@hooks/useTheme';
-import { useRouter, useSegments } from 'expo-router';
 import { useDailyLearningLogs } from '@hooks/useDailyLearningLogs';
-import DailyProgressar from '../components/DailyProgressar';
-import { Header } from '../components/Header';
-import { DropdownMenu } from '../components/DropdownMenu';
-import { useSelector } from 'react-redux';
-import type { RootState } from '../../data/repository/store';
-import { finishStudy } from '../../data/api/FinishStudyApi';
-import CongratulationsBottomSheet from '../components/CongratulationsBottomSheet';
+import { useTheme } from '@hooks/useTheme';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useFocusEffect } from '@react-navigation/native';
-import DailyLearningLogsTest from '../components/DailyLearningLogsTest';
+import { useRouter, useSegments } from 'expo-router';
+import React, { useEffect, useState } from 'react';
+import { Dimensions, Image, Modal, Platform, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { Button } from 'react-native-paper';
+import { SafeAreaView } from 'react-native-safe-area-context';
+import { useSelector } from 'react-redux';
+import { finishStudy } from '../../data/api/FinishStudyApi';
+import type { RootState } from '../../data/repository/store';
+import CongratulationsBottomSheet from '../components/CongratulationsBottomSheet';
+import DailyProgressar from '../components/DailyProgressar';
+import { DropdownMenu } from '../components/DropdownMenu';
+import { Header } from '../components/Header';
 
 const { width, height } = Dimensions.get('window');
 
@@ -148,9 +146,18 @@ const MainPage = () => {
 
   const handleHamburgerPress = () => {
     // 计算汉堡菜单按钮的位置
+    // Header 高度是 70，SafeArea 顶部偏移通常是 44-50 (iOS) 或 0 (Android)
+    // 按钮在 Header 右侧，Y 位置应该是 Header 的中间位置
+    // 菜单会显示在 buttonPosition.y + buttonPosition.height + 8，所以需要确保菜单在 Header 下方
+    const headerHeight = 70;
+    const safeAreaTop = Platform.OS === 'ios' ? 44 : 0; // iOS SafeArea 顶部偏移
+    const headerBottom = safeAreaTop + headerHeight; // Header 底部位置
+    // 按钮 Y 位置：Header 中间减去按钮高度的一半，这样菜单会在 Header 下方
+    const buttonY = safeAreaTop + headerHeight / 2 - 20; // Header 中间减去按钮高度的一半 (40/2=20)
+    
     setButtonPosition({
       x: width - 50,
-      y: 20,
+      y: buttonY,
       width: 40,
       height: 40
     });
@@ -208,17 +215,16 @@ const MainPage = () => {
         title="仝文馆"
         showMenuButton={false}
         showNotificationButton={false}
-        showHamburgerMenu={false}
+        showHamburgerMenu={true}
         onHamburgerPress={handleHamburgerPress}
       />
-      {/* <Button
+      <Button
         mode="contained"
         style={{ marginVertical: 16, backgroundColor: '#007AFF' }}
         onPress={() => router.push('/debug/test-daily-log-request')}
       >
         Test Daily Log API
-        
-      </Button> */}
+      </Button>
       {/* 今日目标进度条区域 */}
       <View style={styles.goalContainer}>
         {/* Left: 今日目标 above the target count, both left-aligned */}

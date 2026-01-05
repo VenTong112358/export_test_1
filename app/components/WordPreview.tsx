@@ -1,22 +1,24 @@
-import React, { useState, useRef } from 'react';
-import {
-  View,
-  Text,
-  StyleSheet,
-  ScrollView,
-  TouchableOpacity,
-  Dimensions,
-  Platform,
-} from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { SpeakApi } from '@data/api/SpeakApi';
+import { DailyNewWord } from '@data/model/WordPreview';
 import { Ionicons } from '@expo/vector-icons';
+import { useDailyLearningLogs } from '@hooks/useDailyLearningLogs';
 import { useTheme } from '@hooks/useTheme';
 import { useRouter } from 'expo-router';
-import { DailyNewWord } from '@data/model/WordPreview';
-import { SpeakApi } from '@data/api/SpeakApi';
+import React, { useRef, useState } from 'react';
+import {
+  Dimensions,
+  Modal,
+  Platform,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View,
+} from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
+import { Header } from './Header';
 // Defer importing expo-av until needed to avoid runtime crashes with version mismatch
 let Audio: any = null;
-import { Header } from './Header';
 
 
 const { width, height } = Dimensions.get('window');
@@ -38,6 +40,71 @@ export const WordPreview: React.FC<WordPreviewProps> = ({ logId, words, onBackPr
   // Exception sets: when hidden, these are shown; when shown, these are hidden
   const [englishExceptions, setEnglishExceptions] = useState<Set<number>>(new Set());
   const [chineseExceptions, setChineseExceptions] = useState<Set<number>>(new Set());
+  
+  // State for reviewed words modal
+  const [showReviewedWordsModal, setShowReviewedWordsModal] = useState(false);
+  
+  // Get all logs from Redux to find the current log
+  const { logs } = useDailyLearningLogs();
+  
+  // Get reviewed words only from the current passage (logId)
+  const currentReviewedWords = React.useMemo(() => {
+    console.log('[WordPreview] Collecting reviewed words for current logId:', logId, 'type:', typeof logId);
+    
+    if (!logId) {
+      console.log('[WordPreview] No logId provided');
+      return [];
+    }
+    
+    if (!Array.isArray(logs) || logs.length === 0) {
+      console.log('[WordPreview] No logs available or logs is empty');
+      return [];
+    }
+    
+    // Convert logId to number for comparison (in case it's a string)
+    const logIdNum = typeof logId === 'string' ? parseInt(logId, 10) : logId;
+    
+    // Find the current log by logId (try both number and string comparison)
+    const currentLog = logs.find((log: any) => {
+      const logIdMatch = log.id === logIdNum || log.id === logId || String(log.id) === String(logId);
+      return logIdMatch;
+    }) as any;
+    
+    console.log('[WordPreview] Searching for log:', {
+      searchLogId: logId,
+      searchLogIdNum: logIdNum,
+      logsCount: logs.length,
+      allLogIds: logs.map((l: any) => ({ id: l.id, type: typeof l.id, title: l.english_title }))
+    });
+    
+    if (!currentLog) {
+      console.log('[WordPreview] Current log not found for logId:', logId);
+      console.log('[WordPreview] Available log IDs:', logs.map((l: any) => l.id));
+      return [];
+    }
+    
+    // Check both field names: daily_reviewed_words (expected) and daily_review_words (actual API)
+    const reviewedWords = currentLog.daily_reviewed_words || (currentLog as any).daily_review_words;
+    
+    console.log('[WordPreview] Current log found:', {
+      id: currentLog.id,
+      englishTitle: currentLog.english_title,
+      hasDailyReviewedWords: !!currentLog.daily_reviewed_words,
+      hasDailyReviewWords: !!(currentLog as any).daily_review_words,
+      reviewedWords: reviewedWords,
+      reviewedWordsType: typeof reviewedWords,
+      reviewedWordsIsArray: Array.isArray(reviewedWords),
+      reviewedWordsLength: reviewedWords?.length || 0,
+    });
+    
+    if (reviewedWords && Array.isArray(reviewedWords) && reviewedWords.length > 0) {
+      console.log('[WordPreview] Current log has', reviewedWords.length, 'reviewed words');
+      return reviewedWords;
+    } else {
+      console.log('[WordPreview] Current log has no reviewed words or invalid format');
+      return [];
+    }
+  }, [logId, logs]);
 
   // Handle English word click
   const handleEnglishWordClick = (wordId: number) => {
@@ -363,6 +430,24 @@ export const WordPreview: React.FC<WordPreviewProps> = ({ logId, words, onBackPr
           <Text style={styles.subtitleText}>今日新学单词</Text>
         </View>
 
+        {/* Test Button for Reviewed Words */}
+        {__DEV__ && (
+          <View style={styles.testSection}>
+            <TouchableOpacity
+              style={styles.testButton}
+              onPress={() => {
+                console.log('[WordPreview] Current reviewed words:', currentReviewedWords);
+                console.log('[WordPreview] Reviewed words count:', currentReviewedWords.length);
+                setShowReviewedWordsModal(true);
+              }}
+            >
+              <Text style={styles.testButtonText}>
+                🧪 Show Reviewed Words ({currentReviewedWords.length})
+              </Text>
+            </TouchableOpacity>
+          </View>
+        )}
+
         {/* Toggle Controls */}
         <View style={styles.toggleSection}>
           <TouchableOpacity
@@ -402,6 +487,52 @@ export const WordPreview: React.FC<WordPreviewProps> = ({ logId, words, onBackPr
           <Text style={styles.startLearningButtonText}>Start Today's Learning</Text>
         </TouchableOpacity>
       </View>
+
+      {/* Reviewed Words Modal */}
+      <Modal
+        visible={showReviewedWordsModal}
+        transparent
+        animationType="slide"
+        onRequestClose={() => setShowReviewedWordsModal(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContent}>
+            <View style={styles.modalHeader}>
+              <Text style={styles.modalTitle}>Reviewed Words</Text>
+              <TouchableOpacity
+                onPress={() => setShowReviewedWordsModal(false)}
+                style={styles.modalCloseButton}
+              >
+                <Ionicons name="close" size={24} color="#333" />
+              </TouchableOpacity>
+            </View>
+            
+            <ScrollView style={styles.modalScrollView}>
+              {currentReviewedWords.length === 0 ? (
+                <Text style={styles.emptyText}>No reviewed words found</Text>
+              ) : (
+                currentReviewedWords.map((word: DailyNewWord) => (
+                  <View key={`${word.id}-${word.word}`} style={styles.reviewedWordItem}>
+                    <View style={styles.reviewedWordRow}>
+                      <View style={styles.reviewedWordTextContainer}>
+                        <Text style={styles.reviewedWordText}>{word.word}</Text>
+                        <Text style={styles.reviewedPhoneticText}>{word.phonetic}</Text>
+                      </View>
+                      <TouchableOpacity
+                        style={styles.soundButton}
+                        onPress={() => handleSoundPress(word.word)}
+                      >
+                        <Ionicons name="volume-high-outline" size={20} color="#FC9B33" />
+                      </TouchableOpacity>
+                    </View>
+                    <Text style={styles.reviewedDefinitionText}>{word.definition}</Text>
+                  </View>
+                ))
+              )}
+            </ScrollView>
+          </View>
+        </View>
+      </Modal>
     </SafeAreaView>
   );
 };
@@ -569,6 +700,103 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: 'bold',
     fontFamily: Platform.select({ ios: 'DM Sans', android: 'sans-serif' }),
+  },
+  testSection: {
+    marginHorizontal: width * 0.04,
+    marginBottom: height * 0.02,
+  },
+  testButton: {
+    backgroundColor: '#FF5722',
+    padding: width * 0.04,
+    borderRadius: 8,
+    alignItems: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 3,
+  },
+  testButtonText: {
+    color: 'white',
+    fontSize: 14,
+    fontWeight: 'bold',
+    fontFamily: Platform.select({ ios: 'DM Sans', android: 'sans-serif' }),
+  },
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  modalContent: {
+    backgroundColor: 'white',
+    borderRadius: 12,
+    width: width * 0.9,
+    maxHeight: height * 0.8,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.25,
+    shadowRadius: 4,
+    elevation: 5,
+  },
+  modalHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    padding: width * 0.04,
+    borderBottomWidth: 1,
+    borderBottomColor: '#e0e0e0',
+  },
+  modalTitle: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    color: '#333',
+    fontFamily: Platform.select({ ios: 'DM Sans', android: 'sans-serif' }),
+  },
+  modalCloseButton: {
+    padding: 4,
+  },
+  modalScrollView: {
+    maxHeight: height * 0.6,
+  },
+  reviewedWordItem: {
+    padding: width * 0.04,
+    borderBottomWidth: 1,
+    borderBottomColor: '#f0f0f0',
+  },
+  reviewedWordRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: height * 0.01,
+  },
+  reviewedWordTextContainer: {
+    flex: 1,
+  },
+  reviewedWordText: {
+    fontSize: 16,
+    fontWeight: 'bold',
+    color: '#0C1A30',
+    fontFamily: Platform.select({ ios: 'DM Sans', android: 'sans-serif' }),
+  },
+  reviewedPhoneticText: {
+    fontSize: 14,
+    color: '#666',
+    fontStyle: 'italic',
+    fontFamily: Platform.select({ ios: 'Inter', android: 'sans-serif' }),
+  },
+  reviewedDefinitionText: {
+    fontSize: 14,
+    color: '#333',
+    lineHeight: 20,
+    fontFamily: Platform.select({ ios: 'Inter', android: 'sans-serif' }),
+  },
+  emptyText: {
+    padding: width * 0.04,
+    textAlign: 'center',
+    color: '#666',
+    fontSize: 14,
+    fontFamily: Platform.select({ ios: 'Inter', android: 'sans-serif' }),
   },
 }); 
 export default WordPreview;

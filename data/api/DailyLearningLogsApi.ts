@@ -1,6 +1,6 @@
-import { HttpClient } from './HttpClient';
-import { API_ENDPOINTS } from './ApiConfig';
 import { DailyLearningLogsResponse } from '@data/model/DailyLearningLog';
+import { API_ENDPOINTS } from './ApiConfig';
+import { HttpClient } from './HttpClient';
 
 /**
  * Daily Learning Logs API

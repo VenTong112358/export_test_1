@@ -1,16 +1,16 @@
-import React from 'react';
-import {
-  View,
-  Text,
-  TouchableOpacity,
-  StyleSheet,
-  Dimensions,
-  Platform,
-  Modal,
-  Pressable,
-} from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useTheme } from '@hooks/useTheme';
+import React from 'react';
+import {
+  Dimensions,
+  Modal,
+  Platform,
+  Pressable,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View,
+} from 'react-native';
 import Svg, { Path } from 'react-native-svg';
 
 const { width, height } = Dimensions.get('window');
@@ -54,10 +54,19 @@ export const DropdownMenu: React.FC<DropdownMenuProps> = ({
   };
 
   // 计算菜单位置 - 使用指定的CSS尺寸
+  // 只有一个菜单项，所以高度可以更小
   const menuWidth = 147;
-  const menuHeight = 171;
+  const menuHeight = 57; // 单个菜单项的高度（约 57px）
   const menuX = Math.min(buttonPosition.x + buttonPosition.width - menuWidth, width - menuWidth - 16);
-  const menuY = buttonPosition.y + buttonPosition.height + 8;
+  
+  // 确保菜单显示在 Header 下方
+  // Header 高度是 70，SafeArea 顶部偏移通常是 44 (iOS) 或 0 (Android)
+  const headerHeight = 70;
+  const safeAreaTop = Platform.OS === 'ios' ? 44 : 0;
+  const headerBottom = safeAreaTop + headerHeight;
+  const calculatedMenuY = buttonPosition.y + buttonPosition.height + 8;
+  // 菜单至少应该在 Header 下方，所以取两者中的较大值
+  const menuY = Math.max(calculatedMenuY, headerBottom + 4);
 
   return (
     <Modal
@@ -98,24 +107,6 @@ export const DropdownMenu: React.FC<DropdownMenuProps> = ({
             <Ionicons name="time-outline" size={20} color="#0C1A30" />
             <Text style={styles.menuText}>历史文章</Text>
           </TouchableOpacity>
-
-          {/* 分割线 */}
-          <View style={styles.divider} />
-
-          {/* 收藏菜单 */}
-          <TouchableOpacity style={styles.menuItem} onPress={handleFavoritesPress}>
-            <Ionicons name="heart-outline" size={20} color="#0C1A30" />
-            <Text style={styles.menuText}>收藏菜单</Text>
-          </TouchableOpacity>
-
-          {/* 分割线 */}
-          <View style={styles.divider} />
-
-          {/* 我的笔记 */}
-          <TouchableOpacity style={styles.menuItem} onPress={handleNotesPress}>
-            <Ionicons name="document-text-outline" size={20} color="#0C1A30" />
-            <Text style={styles.menuText}>我的笔记</Text>
-          </TouchableOpacity>
           </View>
         </View>
       </Pressable>
@@ -142,7 +133,7 @@ const styles = StyleSheet.create({
     right: 0,
     bottom: 0,
     borderRadius: 8,
-    justifyContent: 'space-around',
+    justifyContent: 'center',
     paddingVertical: 8,
   },
   menuItem: {

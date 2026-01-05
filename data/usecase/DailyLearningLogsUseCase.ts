@@ -1,6 +1,6 @@
-import { createAsyncThunk, createSlice, PayloadAction } from '@reduxjs/toolkit';
+import { AdditionalInformation, DailyLearningLog } from '@data/model/DailyLearningLog';
 import { DailyLearningLogsRepositoryImpl } from '@data/repository/DailyLearningLogsRepository';
-import { DailyLearningLogsResponse, DailyLearningLog, AdditionalInformation } from '@data/model/DailyLearningLog';
+import { createAsyncThunk, createSlice, PayloadAction } from '@reduxjs/toolkit';
 
 // State类型定义
 export interface DailyLearningLogsState {
@@ -55,11 +55,11 @@ export const fetchDailyLearningLogs = createAsyncThunk(
 
 export const fetchDailyLearningLogsByDate = createAsyncThunk(
   'dailyLearningLogs/fetchLogsByDate',
-  async ({ userId, date }: { userId: number; date: string }, { rejectWithValue }) => {
-    console.log('[UseCase] Fetching daily learning logs for user:', userId, 'date:', date);
+  async ({ date }: { date: string }, { rejectWithValue }) => {
+    console.log('[UseCase] Fetching daily learning logs by date:', date);
     
     try {
-      const response = await repository.fetchDailyLearningLogsByDate(userId, date);
+      const response = await repository.fetchDailyLearningLogsByDate(date);
       console.log('[UseCase] Successfully fetched logs by date:', {
         count: response.logs.length,
         date,
@@ -75,11 +75,11 @@ export const fetchDailyLearningLogsByDate = createAsyncThunk(
 
 export const fetchDailyLearningLogsByTag = createAsyncThunk(
   'dailyLearningLogs/fetchLogsByTag',
-  async ({ userId, tag }: { userId: number; tag: string }, { rejectWithValue }) => {
-    console.log('[UseCase] Fetching daily learning logs for user:', userId, 'tag:', tag);
+  async ({ tag }: { tag: string }, { rejectWithValue }) => {
+    console.log('[UseCase] Fetching daily learning logs by tag:', tag);
     
     try {
-      const response = await repository.fetchDailyLearningLogsByTag(userId, tag);
+      const response = await repository.fetchDailyLearningLogsByTag(tag);
       console.log('[UseCase] Successfully fetched logs by tag:', {
         count: response.logs.length,
         tag,
@@ -95,13 +95,13 @@ export const fetchDailyLearningLogsByTag = createAsyncThunk(
 
 export const clearDailyLearningLogsCache = createAsyncThunk(
   'dailyLearningLogs/clearCache',
-  async (userId: number, { rejectWithValue }) => {
-    console.log('[UseCase] Clearing cache for user:', userId);
+  async (_, { rejectWithValue }) => {
+    console.log('[UseCase] Clearing cache');
     
     try {
-      await repository.clearCache(userId);
-      console.log('[UseCase] Successfully cleared cache for user:', userId);
-      return { userId };
+      await repository.clearCache();
+      console.log('[UseCase] Successfully cleared cache');
+      return {};
     } catch (error) {
       console.error('[UseCase] Failed to clear cache:', error);
       return rejectWithValue(error instanceof Error ? error.message : 'Failed to clear cache');
@@ -162,7 +162,7 @@ const dailyLearningLogsSlice = createSlice({
       })
       .addCase(fetchDailyLearningLogs.fulfilled, (state, action) => {
         state.isLoading = false;
-        state.logs = action.payload.logs
+        state.logs = action.payload.logs;
         state.additional_information = action.payload.additional_information;
         state.lastFetched = new Date().toISOString();
         state.error = null;

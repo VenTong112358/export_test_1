@@ -1,14 +1,17 @@
-import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Dimensions, Platform } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
-import { Ionicons } from '@expo/vector-icons';
-import { useTheme } from '@hooks/useTheme';
+import { AppDispatch, RootState } from '@data/repository/store';
+import { getWordsWithCaiji } from '@data/usecase/WordsWithCaijiUseCase';
 import { useDailyLearningLogs } from '@hooks/useDailyLearningLogs';
 import { useLocalArticles } from '@hooks/useLocalArticles';
-import { Header } from '../components/Header';
+import { useTheme } from '@hooks/useTheme';
+import { useFocusEffect, useRouter } from 'expo-router';
+import React, { useEffect, useState } from 'react';
+import { Dimensions, Platform, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { AnimatedCircularProgress } from 'react-native-circular-progress';
-import { useRouter, useFocusEffect } from 'expo-router';
-import { useSelector } from 'react-redux';
+import { SafeAreaView } from 'react-native-safe-area-context';
+import { useDispatch, useSelector } from 'react-redux';
+import { Header } from '../components/Header';
+import LevelBar from '../components/LevelBar';
+import RadarChart from '../components/RadarChart';
 
 const { width, height } = Dimensions.get('window');
 
@@ -16,11 +19,21 @@ export default function WordsPage() {
   const { theme } = useTheme();
   const { logs, isLoading, error, additional_information } = useDailyLearningLogs();
   const router = useRouter();
+  const dispatch = useDispatch<AppDispatch>();
   const userId = useSelector((state: any) => state.auth.user?.id);
   const { articles, newWords, isLoading: localLoading, getArticlesGroupedByDate, refreshArticles } = useLocalArticles(userId);
+  
+  // Words with Caiji state
+  const { data: wordsWithCaijiData, isLoading: wordsWithCaijiLoading, error: wordsWithCaijiError } = useSelector(
+    (state: RootState) => state.wordsWithCaiji
+  );
 
   // Accordion state: store expanded article ids
   const [expandedArticles, setExpandedArticles] = useState<string[]>([]);
+  
+  // Swipeable card page state
+  const [currentPage, setCurrentPage] = useState(0);
+  const [cardWidth, setCardWidth] = useState(width - (width * 0.04 * 2));
 
   // 默认全部展开：每次 articles 变化时自动展开所有 article
   useEffect(() => {
@@ -81,6 +94,102 @@ export default function WordsPage() {
   const progression = additional_information?.progression ?? 0;
   const wordBookName = additional_information?.word_book?.name ?? '';
 
+  // Calculate overall level from words with caiji data
+  // Helper function to extract learning_factor from word data
+  // Try multiple possible field names
+  const getLearningFactor = (wordData: any): number => {
+    // Try different possible field names
+    return wordData.learning_factor ?? 
+           wordData.caiji ?? 
+           wordData.learningFactor ?? 
+           wordData.factor ?? 
+           wordData.caiji_factor ?? 
+           wordData.mastery ?? 
+           wordData.mastery_factor ?? 
+           0;
+  };
+
+  const calculateOverallLevel = (): number => {
+    console.log('[WordsPage] Calculating overall level from wordsWithCaijiData:', wordsWithCaijiData);
+    
+    if (!wordsWithCaijiData?.words || wordsWithCaijiData.words.length === 0) {
+      console.log('[WordsPage] No words data available, returning 0');
+      return 0; // Default to 0 if no data
+    }
+    
+    console.log('[WordsPage] Words count:', wordsWithCaijiData.words.length);
+    
+    // Calculate average learning factor using helper function
+    const totalFactor = wordsWithCaijiData.words.reduce((sum, word) => sum + getLearningFactor(word), 0);
+    const avgFactor = totalFactor / wordsWithCaijiData.words.length;
+    
+    console.log('[WordsPage] Average learning factor:', avgFactor);
+    
+    // learning_factor is typically 0-1, convert to 0-100
+    // If learning_factor is already 0-100, use it directly
+    const level = avgFactor > 1 ? avgFactor : avgFactor * 100;
+    const finalLevel = Math.max(0, Math.min(100, level));
+    
+    console.log('[WordsPage] Calculated overall level:', finalLevel);
+    
+    return finalLevel;
+  };
+
+  // Calculate radar chart data from words with caiji
+  const calculateRadarData = () => {
+    if (!wordsWithCaijiData?.words || wordsWithCaijiData.words.length === 0) {
+      // Default mock data if no API data
+      return [
+        { label: '单词', labelEn: 'Words', value: 75 },
+        { label: '语法', labelEn: 'Grammar', value: 60 },
+        { label: '阅读', labelEn: 'Reading', value: 85 },
+      ];
+    }
+    
+    // For now, use average learning factor for all dimensions
+    // TODO: Update when API provides separate values for words, grammar, reading
+    const avgFactor = wordsWithCaijiData.words.reduce((sum, word) => sum + getLearningFactor(word), 0) / wordsWithCaijiData.words.length;
+    const value = avgFactor > 1 ? avgFactor : avgFactor * 100;
+    
+    return [
+      { label: '单词', labelEn: 'Words', value: Math.round(value) },
+      { label: '语法', labelEn: 'Grammar', value: Math.round(value * 0.8) },
+      { label: '阅读', labelEn: 'Reading', value: Math.round(value * 1.1) },
+    ];
+  };
+
+  const radarData = calculateRadarData();
+  const overallLevel = calculateOverallLevel();
+  
+  // Get words from caiji API for Recent new words section
+  const getWordsFromCaiji = () => {
+    if (!wordsWithCaijiData?.words || wordsWithCaijiData.words.length === 0) {
+      return [];
+    }
+    
+    // Return words with learning_factor, sorted by learning_factor (highest first)
+    return wordsWithCaijiData.words
+      .map((wordData) => {
+        const learningFactor = getLearningFactor(wordData);
+        return {
+          word: wordData.word || '',
+          learning_factor: learningFactor,
+          // Add other fields if available in API response
+          phonetic: wordData.phonetic || '',
+          definition: wordData.definition || '',
+        };
+      })
+      .sort((a, b) => b.learning_factor - a.learning_factor); // Sort by learning_factor descending
+  };
+
+  const wordsFromCaiji = getWordsFromCaiji();
+  
+  // Log calculated values
+  useEffect(() => {
+    console.log('[WordsPage] Overall level:', overallLevel);
+    console.log('[WordsPage] Radar data:', radarData);
+  }, [overallLevel, radarData]);
+
   // Toggle expand/collapse for an article
   const toggleArticle = (articleId: string) => {
     setExpandedArticles(prev =>
@@ -93,9 +202,25 @@ export default function WordsPage() {
   // 页面聚焦时刷新
   useFocusEffect(
     React.useCallback(() => {
+      console.log('[WordsPage] Page focused, refreshing articles and fetching words with caiji');
       refreshArticles();
-    }, [userId])
+      // Fetch words with caiji data when entering the page
+      console.log('[WordsPage] Dispatching getWordsWithCaiji...');
+      dispatch(getWordsWithCaiji());
+    }, [userId, dispatch])
   );
+  
+  // Log when wordsWithCaijiData changes
+  useEffect(() => {
+    console.log('[WordsPage] wordsWithCaijiData changed:', wordsWithCaijiData);
+    console.log('[WordsPage] wordsWithCaijiLoading:', wordsWithCaijiLoading);
+    console.log('[WordsPage] wordsWithCaijiError:', wordsWithCaijiError);
+    if (wordsWithCaijiData?.words && wordsWithCaijiData.words.length > 0) {
+      console.log('[WordsPage] Sample word data:', wordsWithCaijiData.words[0]);
+      console.log('[WordsPage] Sample learning_factor:', wordsWithCaijiData.words[0]?.learning_factor);
+      console.log('[WordsPage] All learning_factors:', wordsWithCaijiData.words.map(w => ({ word: w.word, learning_factor: w.learning_factor })));
+    }
+  }, [wordsWithCaijiData, wordsWithCaijiLoading, wordsWithCaijiError]);
 
   return (
     <SafeAreaView style={[styles.container, { backgroundColor: theme.colors.background }]}>
@@ -115,29 +240,78 @@ export default function WordsPage() {
               <Text style={styles.titleText}>Day Day up</Text>
               <Text style={styles.subtitleText}>每日进步</Text>
             </View>
-            {/* Arc progress bar and info */}
-            <View style={styles.dailyProgressSection}>
-              <View style={styles.arcProgressContainer}>
-                <AnimatedCircularProgress
-                  size={180}
-                  width={16}
-                  fill={learningProportion * 100}
-                  arcSweepAngle={270}
-                  rotation={225}
-                  lineCap="round"
-                  tintColor="#FC9B33"
-                  backgroundColor="#FFF7E6"
-                  children={() => (
-                    <Text style={styles.arcProgressPercentText}>{formatPercent(learningProportion)}</Text>
-                  )}
-                />
-              </View>
-              {/* Progression and word book name */}
-              <View style={styles.arcProgressInfoContainer}>
-                <Text style={styles.arcProgressInfoText}>已学{progression}个单词</Text>
-                <Text style={styles.arcProgressInfoText}>{wordBookName}</Text>
-              </View>
+            {/* Swipeable card container */}
+            <View 
+              style={styles.dailyProgressSection}
+              onLayout={(event) => {
+                const { width: layoutWidth } = event.nativeEvent.layout;
+                setCardWidth(layoutWidth);
+              }}
+            >
+              <ScrollView
+                horizontal
+                pagingEnabled
+                showsHorizontalScrollIndicator={false}
+                style={styles.swipeableCardScrollView}
+                contentContainerStyle={styles.swipeableCardContent}
+                onMomentumScrollEnd={(event) => {
+                  if (cardWidth > 0) {
+                    const pageIndex = Math.round(
+                      event.nativeEvent.contentOffset.x / cardWidth
+                    );
+                    setCurrentPage(pageIndex);
+                  }
+                }}
+              >
+                {/* Page 1: Arc progress bar */}
+                <View style={styles.swipeableCardPage}>
+                  <View style={styles.arcProgressContainer}>
+                    <AnimatedCircularProgress
+                      size={180}
+                      width={16}
+                      fill={learningProportion * 100}
+                      arcSweepAngle={270}
+                      rotation={225}
+                      lineCap="round"
+                      tintColor="#FC9B33"
+                      backgroundColor="#FFF7E6"
+                      children={() => (
+                        <Text style={styles.arcProgressPercentText}>{formatPercent(learningProportion)}</Text>
+                      )}
+                    />
+                  </View>
+                  {/* Progression and word book name */}
+                  <View style={styles.arcProgressInfoContainer}>
+                    <Text style={styles.arcProgressInfoText}>已学{progression}个单词</Text>
+                    <Text style={styles.arcProgressInfoText}>{wordBookName}</Text>
+                  </View>
+                </View>
+                
+                {/* Page 2: Overall Level Bar */}
+                <View style={styles.swipeableCardPage}>
+                  <View style={styles.levelBarContainer}>
+                    <LevelBar 
+                      level={overallLevel} 
+                      label="整体水平"
+                      showLabel={true}
+                    />
+                  </View>
+                </View>
+                
+                {/* Page 3: Radar Chart */}
+                <View style={styles.swipeableCardPage}>
+                  <View style={styles.radarChartContainer}>
+                    <RadarChart data={radarData} size={250} />
+                  </View>
+                </View>
+              </ScrollView>
               
+              {/* Page indicator dots */}
+              <View style={styles.pageIndicatorContainer}>
+                <View style={[styles.pageIndicatorDot, currentPage === 0 && styles.pageIndicatorDotActive]} />
+                <View style={[styles.pageIndicatorDot, currentPage === 1 && styles.pageIndicatorDotActive]} />
+                <View style={[styles.pageIndicatorDot, currentPage === 2 && styles.pageIndicatorDotActive]} />
+              </View>
             </View>
           </>
         )}
@@ -213,76 +387,70 @@ export default function WordsPage() {
           </Text>
         </View>
 
-        {/* Date Display */}
-        {articles.length > 0 && (
-          <View style={styles.dateSection}>
-            <Text style={styles.dateText}>
-              {getFormattedDate(articles[0].date)}
-            </Text>
-            <Text style={styles.dateNote}>
-              ({articles.length} completed article{articles.length > 1 ? 's' : ''})
-            </Text>
-          </View>
-        )}
-
         {/* Loading State */}
-        {isLoading && (
+        {wordsWithCaijiLoading && (
           <View style={styles.loadingContainer}>
             <Text style={styles.loadingText}>Loading words...</Text>
           </View>
         )}
 
         {/* Error State */}
-        {error && (
+        {wordsWithCaijiError && (
           <View style={styles.errorContainer}>
-            <Text style={styles.errorText}>Error: {error}</Text>
+            <Text style={styles.errorText}>Error: {wordsWithCaijiError}</Text>
           </View>
         )}
 
-        {/* Words List - Grouped by Articles */}
-        {articles.length > 0 && (
+        {/* Words List - From Caiji API */}
+        {!wordsWithCaijiLoading && !wordsWithCaijiError && wordsFromCaiji.length > 0 && (
           <View style={styles.wordsSection}>
-            {Object.entries(getArticlesGroupedByDate()).map(([date, dateArticles]) => (
-              <View key={date} style={styles.dateGroupContainer}>
-                <Text style={styles.dateGroupTitle}>{getFormattedDate(date)}</Text>
-                {dateArticles.map((article) => (
-                  <View key={article.id} style={styles.articleContainer}>
-                    <TouchableOpacity onPress={() => toggleArticle(article.id)} activeOpacity={0.7} style={{flexDirection:'row',alignItems:'center',justifyContent:'space-between'}}>
-                      <View style={{flex:1}}>
-                        <Text style={styles.articleTitle}>{article.englishTitle}</Text>
-                        {article.chineseTitle && (
-                          <Text style={styles.articleSubtitle}>{article.chineseTitle}</Text>
+            <View style={styles.dateGroupContainer}>
+              <Text style={styles.dateGroupTitle}>Recent Learned Words</Text>
+              {wordsFromCaiji.map((wordData, index) => {
+                // learning_factor is a coefficient from 0 to 1, convert to percentage (0-100)
+                // Handle cases where learning_factor might be undefined, null, or already a percentage
+                let factorValue = 0;
+                if (wordData.learning_factor !== undefined && wordData.learning_factor !== null) {
+                  if (wordData.learning_factor > 1) {
+                    // Already a percentage (0-100)
+                    factorValue = wordData.learning_factor;
+                  } else {
+                    // Coefficient (0-1), convert to percentage
+                    factorValue = wordData.learning_factor * 100;
+                  }
+                }
+                
+                return (
+                  <View key={`word-${index}-${wordData.word}`} style={styles.wordItem}>
+                    <View style={styles.wordRow}>
+                      <View style={styles.wordInfoContainer}>
+                        <Text style={styles.wordText}>{wordData.word}</Text>
+                        {wordData.phonetic && (
+                          <Text style={styles.phoneticText}>[{wordData.phonetic}]</Text>
                         )}
                       </View>
-                      <Ionicons name={expandedArticles.includes(article.id) ? 'chevron-up' : 'chevron-down'} size={22} color="#FC9B33" style={{marginLeft:8}} />
-                    </TouchableOpacity>
-                    {expandedArticles.includes(article.id) && (
-                      <View style={{marginTop:8}}>
-                        {article.newWords.map((word, index) => (
-                          <View key={`${article.id}-${word.id}`} style={styles.wordItem}>
-                            <View style={styles.wordRow}>
-                              <Text style={styles.wordText}>{word.word}</Text>
-                              {word.phonetic && (
-                                <Text style={styles.phoneticText}>[{word.phonetic}]</Text>
-                              )}
-                            </View>
-                            <Text style={styles.definitionText}>{word.definition}</Text>
-                          </View>
-                        ))}
+                      <View style={styles.learningFactorContainer}>
+                        <Text style={styles.learningFactorLabel}>掌握度</Text>
+                        <Text style={styles.learningFactorValue}>
+                          {Math.round(factorValue)}%
+                        </Text>
                       </View>
+                    </View>
+                    {wordData.definition && (
+                      <Text style={styles.definitionText}>{wordData.definition}</Text>
                     )}
                   </View>
-                ))}
-              </View>
-            ))}
+                );
+              })}
+            </View>
           </View>
         )}
 
         {/* No Words State */}
-        {!isLoading && !error && !localLoading && articles.length === 0 && (
+        {!wordsWithCaijiLoading && !wordsWithCaijiError && wordsFromCaiji.length === 0 && (
           <View style={styles.noWordsContainer}>
-            <Text style={styles.noWordsText}>No completed articles yet</Text>
-            <Text style={styles.noWordsSubtext}>Complete articles to see new words here</Text>
+            <Text style={styles.noWordsText}>No words found</Text>
+            <Text style={styles.noWordsSubtext}>Complete articles to see learned words here</Text>
           </View>
         )}
       </ScrollView>
@@ -403,7 +571,30 @@ const styles = StyleSheet.create({
   wordRow: {
     flexDirection: 'row',
     alignItems: 'center',
+    justifyContent: 'space-between',
     marginBottom: height * 0.005,
+  },
+  wordInfoContainer: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    flexWrap: 'wrap',
+  },
+  learningFactorContainer: {
+    alignItems: 'flex-end',
+    marginLeft: width * 0.02,
+  },
+  learningFactorLabel: {
+    fontSize: 10,
+    color: '#999',
+    fontFamily: Platform.select({ ios: 'Inter', android: 'sans-serif' }),
+    marginBottom: 2,
+  },
+  learningFactorValue: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: '#FC9B33',
+    fontFamily: Platform.select({ ios: 'DM Sans', android: 'sans-serif' }),
   },
   wordText: {
     fontSize: 16,
@@ -448,7 +639,7 @@ const styles = StyleSheet.create({
     marginHorizontal: width * 0.04,
     marginTop: height * 0.02,
     marginBottom: height * 0.01,
-    paddingVertical: height * 0.03,
+    paddingVertical: height * 0.015,
     alignItems: 'center',
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
@@ -469,7 +660,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     marginBottom: 4,
-    marginTop: 20,
+    marginTop: 10,
     
   },
   arcProgressCenterTextContainer: {
@@ -497,7 +688,49 @@ const styles = StyleSheet.create({
     color: '#333',
     fontFamily: Platform.select({ ios: 'Inter', android: 'sans-serif' }),
     marginVertical: 1,
-    marginTop: 10,
+    marginTop: 6,
+  },
+  radarChartContainer: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: height * 0.01,
+  },
+  levelBarContainer: {
+    width: '100%',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: height * 0.02,
+  },
+  swipeableCardScrollView: {
+    width: '100%',
+  },
+  swipeableCardContent: {
+    alignItems: 'center',
+  },
+  swipeableCardPage: {
+    width: width - (width * 0.04 * 2),
+    alignItems: 'center',
+    justifyContent: 'center',
+    minHeight: 240,
+  },
+  pageIndicatorContainer: {
+    flexDirection: 'row',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginTop: height * 0.01,
+    gap: 8,
+  },
+  pageIndicatorDot: {
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+    backgroundColor: '#D0D0D0',
+  },
+  pageIndicatorDotActive: {
+    backgroundColor: '#FC9B33',
+    width: 8,
+    height: 8,
+    borderRadius: 4,
   },
   // 卡片式功能入口区样式
   featureGridBg: {

@@ -107,6 +107,9 @@ export const API_ENDPOINTS = {
     DETAIL: (word: string) => `/words/${word}`,
   },
   
+  // Words with Caiji API
+  WORDS_WITH_CAIJI: '/words_with_caiji',
+  
   // Articles API
   ARTICLES: {
     PROGRESS: '/articles/progress',

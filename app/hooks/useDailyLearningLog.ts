@@ -1,8 +1,8 @@
-import { useEffect, useState } from 'react';
-import { useDispatch, useSelector } from 'react-redux';
 import { DailyLearningLog } from '@data/model/DailyLearningLog';
 import { DailyLearningLogsRepositoryImpl } from '@data/repository/DailyLearningLogsRepository';
 import { RootState } from '@data/repository/store';
+import { useEffect, useState } from 'react';
+import { useSelector } from 'react-redux';
 
 export const useDailyLearningLog = (logId: number | null) => {
   const [log, setLog] = useState<DailyLearningLog | null>(null);
@@ -62,6 +62,8 @@ export const useDailyLearningLog = (logId: number | null) => {
     isLoading,
     error,
     newWords: log?.daily_new_words || [],
+    // Check both field names: daily_reviewed_words (expected) and daily_review_words (actual API)
+    reviewedWords: (log?.daily_reviewed_words || (log as any)?.daily_review_words) || [],
     // 新增的信息字段
     wordBook: log?.additional_information?.word_book || null,
     learningPlan: log?.additional_information?.learning_plan || null,

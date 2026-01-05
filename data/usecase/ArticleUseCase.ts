@@ -1,8 +1,8 @@
-import { createAsyncThunk, createSlice, PayloadAction } from '@reduxjs/toolkit';
-import { ArticleApi, ArticleRequest, ArticleResponse, WordAnalysis, TranslationRequest } from '@data/api/ArticleApi';
+import { ArticleApi, ArticleRequest, ArticleResponse, TranslationRequest, WordAnalysis } from '@data/api/ArticleApi';
 import { GenerationApi } from '@data/api/GenerationApi';
-import { GenerationRequest, ArticleContent, GenerationResponse } from '@data/model/Generation';
-import { LocalArticleStorage, LocalArticle, LocalNewWord } from '@data/sqlite/LocalArticleStorage';
+import { ArticleContent } from '@data/model/Generation';
+import { LocalArticle, LocalArticleStorage } from '@data/sqlite/LocalArticleStorage';
+import { createAsyncThunk, createSlice, PayloadAction } from '@reduxjs/toolkit';
 
 // Types
 export interface ArticleState {
@@ -213,6 +213,7 @@ export const finishReading = createAsyncThunk(
           userId,
           hasLog: !!log,
           logDailyNewWords: log?.daily_new_words?.length || 0,
+          logDailyReviewedWords: log?.daily_reviewed_words?.length || 0,
           selectedWordsCount: selectedWords?.length || 0,
           logEnglishTitle: log?.english_title,
           logChineseTitle: log?.chinese_title,
@@ -228,6 +229,11 @@ export const finishReading = createAsyncThunk(
           console.warn('[ArticleUseCase] No new words found for logId:', logId);
         }
 
+        // Extract reviewed words from log
+        const reviewedWords = log?.daily_reviewed_words && log.daily_reviewed_words.length > 0
+          ? log.daily_reviewed_words
+          : undefined;
+
         const localArticle: LocalArticle = {
           id: `article-${logId}-${Date.now()}`,
           logId: logId,
@@ -240,6 +246,12 @@ export const finishReading = createAsyncThunk(
             phonetic: word.phonetic || '',
             definition: word.definition || '',
           })),
+          reviewedWords: reviewedWords ? reviewedWords.map((word: any, index: number) => ({
+            id: word.id || index + 1,
+            word: word.word || '',
+            phonetic: word.phonetic || '',
+            definition: word.definition || '',
+          })) : undefined,
           completedAt: new Date().toISOString(),
         };
         
@@ -250,6 +262,7 @@ export const finishReading = createAsyncThunk(
           chineseTitle: localArticle.chineseTitle,
           date: localArticle.date,
           newWordsCount: localArticle.newWords.length,
+          reviewedWordsCount: localArticle.reviewedWords?.length || 0,
           firstWord: localArticle.newWords[0]
         });
         

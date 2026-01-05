@@ -1,12 +1,17 @@
-import { useState, useCallback, useMemo } from 'react';
+import { useCallback, useMemo, useState } from 'react';
 import { stemmer } from 'stemmer';
 
 interface HighlightedSegment {
   text: string;
   isHighlighted: boolean;
+  isReviewed: boolean;
 }
 
-export const useStreamingHighlighter = (newWordsList: string[]) => {
+export const useStreamingHighlighter = (
+  newWordsList: string[],
+  reviewedWordsList: string[] = [],
+  showReviewedWords: boolean = false
+) => {
   const [displayText, setDisplayText] = useState<string>('');
   const [buffer, setBuffer] = useState<string>('');
   
@@ -15,27 +20,28 @@ export const useStreamingHighlighter = (newWordsList: string[]) => {
     return newWordsList.map(word => stemmer(word.toLowerCase()));
   }, [newWordsList]);
 
+  // Normalize reviewed words using stemmer
+  const normalizedReviewedWords = useMemo(() => {
+    return reviewedWordsList.map(word => stemmer(word.toLowerCase()));
+  }, [reviewedWordsList]);
+
   // Process text and highlight all matching words using stemming
   const processTextWithHighlights = useCallback((text: string): HighlightedSegment[] => {
-    if (newWordsList.length === 0) {
-      // If no new words to highlight, split text into individual words for proper word detection
+    if (newWordsList.length === 0 && (!showReviewedWords || reviewedWordsList.length === 0)) {
+      // If no words to highlight, split text into individual words for proper word detection
       const words = text.split(/\b/);
       return words.map(word => ({
         text: word,
-        isHighlighted: false
+        isHighlighted: false,
+        isReviewed: false
       }));
     }
-
-    // console.log('[useStreamingHighlighter] Processing text with highlights:');
-    // console.log('- Text length:', text.length);
-    // console.log('- New words to match:', newWordsList);
-    // console.log('- Normalized words:', normalizedNewWords);
 
     const segments: HighlightedSegment[] = [];
     let lastIndex = 0;
 
     // Find all matches in the text using stemming
-    const matches: Array<{ start: number; end: number; word: string; originalWord: string }> = [];
+    const matches: Array<{ start: number; end: number; word: string; originalWord: string; isReviewed: boolean }> = [];
     
     // Split text into words with word boundaries for proper word detection
     const wordBoundaryRegex = /\b/g;
@@ -59,7 +65,22 @@ export const useStreamingHighlighter = (newWordsList: string[]) => {
               start: wordStart,
               end: wordStart + word.length,
               word: word,
-              originalWord: cleanWord
+              originalWord: cleanWord,
+              isReviewed: false
+            });
+          }
+        }
+        // Check if this word stem matches any of our reviewed words (when showReviewedWords is true)
+        else if (showReviewedWords && normalizedReviewedWords.includes(wordStem)) {
+          // Find the original word in the text
+          const wordStart = text.indexOf(word, currentIndex);
+          if (wordStart !== -1) {
+            matches.push({
+              start: wordStart,
+              end: wordStart + word.length,
+              word: word,
+              originalWord: cleanWord,
+              isReviewed: true
             });
           }
         }
@@ -88,7 +109,8 @@ export const useStreamingHighlighter = (newWordsList: string[]) => {
           if (word.length > 0) {
             segments.push({
               text: word,
-              isHighlighted: false
+              isHighlighted: false,
+              isReviewed: false
             });
           }
         });
@@ -97,7 +119,8 @@ export const useStreamingHighlighter = (newWordsList: string[]) => {
       // Add highlighted match
       segments.push({
         text: match.word,
-        isHighlighted: true
+        isHighlighted: !match.isReviewed, // New words are highlighted (orange)
+        isReviewed: match.isReviewed // Reviewed words are marked for green highlight
       });
 
       lastIndex = match.end;
@@ -112,14 +135,15 @@ export const useStreamingHighlighter = (newWordsList: string[]) => {
         if (word.length > 0) {
           segments.push({
             text: word,
-            isHighlighted: false
+            isHighlighted: false,
+            isReviewed: false
           });
         }
       });
     }
 
-    return segments.length > 0 ? segments : [{ text, isHighlighted: false }];
-  }, [normalizedNewWords, newWordsList]);
+    return segments.length > 0 ? segments : [{ text, isHighlighted: false, isReviewed: false }];
+  }, [normalizedNewWords, normalizedReviewedWords, newWordsList, reviewedWordsList, showReviewedWords]);
 
   // Get current highlighted segments
   const highlightedSegments = processTextWithHighlights(displayText);
