@@ -94,43 +94,51 @@ export default function WordsPage() {
   const progression = additional_information?.progression ?? 0;
   const wordBookName = additional_information?.word_book?.name ?? '';
 
-  // Calculate overall level from words with caiji data
   // Helper function to extract learning_factor from word data
-  // Try multiple possible field names
+  // Try multiple possible field names and nested structures
   const getLearningFactor = (wordData: any): number => {
-    // Try different possible field names
-    return wordData.learning_factor ?? 
-           wordData.caiji ?? 
+    // First try direct field names
+    if (wordData.learning_factor !== undefined && wordData.learning_factor !== null) {
+      return wordData.learning_factor;
+    }
+    
+    // Try nested in l_word_statuss array (most likely structure based on API response)
+    if (wordData.l_word_statuss && Array.isArray(wordData.l_word_statuss) && wordData.l_word_statuss.length > 0) {
+      const firstStatus = wordData.l_word_statuss[0];
+      if (firstStatus?.learning_factor !== undefined && firstStatus?.learning_factor !== null) {
+        return firstStatus.learning_factor;
+      }
+    }
+    
+    // Try other possible field names
+    const fallbackValue = wordData.caiji ?? 
            wordData.learningFactor ?? 
            wordData.factor ?? 
            wordData.caiji_factor ?? 
            wordData.mastery ?? 
            wordData.mastery_factor ?? 
            0;
+    
+    if (fallbackValue === 0) {
+      console.log(`[WordsPage] Warning: Could not find learning_factor for word: ${wordData.word || 'unknown'}, using default 0`);
+    }
+    
+    return fallbackValue;
   };
 
   const calculateOverallLevel = (): number => {
-    console.log('[WordsPage] Calculating overall level from wordsWithCaijiData:', wordsWithCaijiData);
-    
     if (!wordsWithCaijiData?.words || wordsWithCaijiData.words.length === 0) {
-      console.log('[WordsPage] No words data available, returning 0');
       return 0; // Default to 0 if no data
     }
-    
-    console.log('[WordsPage] Words count:', wordsWithCaijiData.words.length);
     
     // Calculate average learning factor using helper function
     const totalFactor = wordsWithCaijiData.words.reduce((sum, word) => sum + getLearningFactor(word), 0);
     const avgFactor = totalFactor / wordsWithCaijiData.words.length;
     
-    console.log('[WordsPage] Average learning factor:', avgFactor);
-    
     // learning_factor is typically 0-1, convert to 0-100
     // If learning_factor is already 0-100, use it directly
     const level = avgFactor > 1 ? avgFactor : avgFactor * 100;
     const finalLevel = Math.max(0, Math.min(100, level));
-    
-    console.log('[WordsPage] Calculated overall level:', finalLevel);
     
     return finalLevel;
   };
@@ -168,27 +176,29 @@ export default function WordsPage() {
     }
     
     // Return words with learning_factor, sorted by learning_factor (highest first)
-    return wordsWithCaijiData.words
+    const words = wordsWithCaijiData.words
       .map((wordData) => {
         const learningFactor = getLearningFactor(wordData);
+        const word = wordData.word || '';
+        
         return {
-          word: wordData.word || '',
+          word: word,
           learning_factor: learningFactor,
           // Add other fields if available in API response
           phonetic: wordData.phonetic || '',
           definition: wordData.definition || '',
         };
       })
+      .filter((word) => word.word !== '') // Filter out words without word field
       .sort((a, b) => b.learning_factor - a.learning_factor); // Sort by learning_factor descending
+    
+    // Log all words with their learning_factor
+    console.log('[WordsPage] All words with learning_factor:', words.map(w => ({ word: w.word, learning_factor: w.learning_factor })));
+    
+    return words;
   };
 
   const wordsFromCaiji = getWordsFromCaiji();
-  
-  // Log calculated values
-  useEffect(() => {
-    console.log('[WordsPage] Overall level:', overallLevel);
-    console.log('[WordsPage] Radar data:', radarData);
-  }, [overallLevel, radarData]);
 
   // Toggle expand/collapse for an article
   const toggleArticle = (articleId: string) => {
@@ -212,9 +222,7 @@ export default function WordsPage() {
   
   // Log when wordsWithCaijiData changes
   useEffect(() => {
-    console.log('[WordsPage] wordsWithCaijiData changed:', wordsWithCaijiData);
-    console.log('[WordsPage] wordsWithCaijiLoading:', wordsWithCaijiLoading);
-    console.log('[WordsPage] wordsWithCaijiError:', wordsWithCaijiError);
+
     if (wordsWithCaijiData?.words && wordsWithCaijiData.words.length > 0) {
       console.log('[WordsPage] Sample word data:', wordsWithCaijiData.words[0]);
       console.log('[WordsPage] Sample learning_factor:', wordsWithCaijiData.words[0]?.learning_factor);
@@ -405,7 +413,6 @@ export default function WordsPage() {
         {!wordsWithCaijiLoading && !wordsWithCaijiError && wordsFromCaiji.length > 0 && (
           <View style={styles.wordsSection}>
             <View style={styles.dateGroupContainer}>
-              <Text style={styles.dateGroupTitle}>Recent Learned Words</Text>
               {wordsFromCaiji.map((wordData, index) => {
                 // learning_factor is a coefficient from 0 to 1, convert to percentage (0-100)
                 // Handle cases where learning_factor might be undefined, null, or already a percentage
@@ -806,7 +813,7 @@ const styles = StyleSheet.create({
     shadowRadius: 6,
     elevation: 3,
   },
-  // 单词本
+  // Word book tool item
   toolItem1: {
     flex: 1,
     alignItems: 'center',

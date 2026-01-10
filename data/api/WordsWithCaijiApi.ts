@@ -56,24 +56,8 @@ export class WordsWithCaijiApi {
         API_ENDPOINTS.WORDS_WITH_CAIJI
       );
       
-      console.log('[WordsWithCaijiApi] Successfully fetched words with caiji, response:', JSON.stringify(response, null, 2));
       console.log('[WordsWithCaijiApi] Words count:', response?.words?.length || 0);
-      if (response?.words && response.words.length > 0) {
-        console.log('[WordsWithCaijiApi] First word sample (full):', JSON.stringify(response.words[0], null, 2));
-        console.log('[WordsWithCaijiApi] First word keys:', Object.keys(response.words[0]));
-        // Check for possible field names
-        const firstWord = response.words[0] as any;
-        console.log('[WordsWithCaijiApi] Possible learning_factor fields:', {
-          learning_factor: firstWord.learning_factor,
-          caiji: firstWord.caiji,
-          learningFactor: firstWord.learningFactor,
-          factor: firstWord.factor,
-          caiji_factor: firstWord.caiji_factor,
-          mastery: firstWord.mastery,
-          mastery_factor: firstWord.mastery_factor,
-        });
-      }
-      
+
       return response;
     } catch (error: any) {
       console.error('[WordsWithCaijiApi] Failed to get words with caiji:', error);

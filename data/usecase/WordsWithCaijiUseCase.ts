@@ -25,13 +25,10 @@ export const getWordsWithCaiji = createAsyncThunk(
   'wordsWithCaiji/getWordsWithCaiji',
   async (_, { rejectWithValue }) => {
     try {
-      console.log('[WordsWithCaijiUseCase] Starting getWordsWithCaiji thunk');
       const wordsWithCaijiApi = WordsWithCaijiApi.getInstance();
       const response = await wordsWithCaijiApi.getWordsWithCaiji();
-      console.log('[WordsWithCaijiUseCase] getWordsWithCaiji completed successfully, response:', response);
       return response;
     } catch (error) {
-      console.error('[WordsWithCaijiUseCase] Failed to get words with caiji:', error);
       return rejectWithValue(error instanceof Error ? error.message : 'Failed to get words with caiji');
     }
   }
