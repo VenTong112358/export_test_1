@@ -9,6 +9,7 @@ import { ActivityIndicator, View } from 'react-native';
 import { PaperProvider } from 'react-native-paper';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { Provider, useSelector } from 'react-redux';
+import { safeRegisterWechatApp } from '@/utils/wechat';
 
 function AuthWrapper() {
   const { restoreAuthFromStorage, checkTokenValidity } = useAuth();
@@ -110,6 +111,15 @@ function AuthWrapper() {
 }
 
 export default function RootLayout() {
+  useEffect(() => {
+    // Ensure WeChat SDK is registered before any WeChat API calls (e.g. sendAuthRequest)
+    safeRegisterWechatApp({
+      appid: 'wx778c1735212de08a',
+      // iOS required; should be a real universal link domain in production
+      universalLink: 'https://temporary_link.com/',
+    });
+  }, []);
+
   return (
     <Provider store={store}>
       <PaperProvider theme={lightTheme}>

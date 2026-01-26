@@ -3,6 +3,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { UserCredentials, UserRegistrationData, AuthResponse, User } from '@data/model/User';
 import { HttpClient } from '@data/api/HttpClient';
 import { SafeJsonUtils } from '@/utils/SafeJsonUtils';
+import { API_CONFIG, API_ENDPOINTS } from '@data/api/ApiConfig';
 import axios from 'axios';
 import { resetLogs } from '@data/usecase/DailyLearningLogsUseCase';
 // If you have a wordbook slice, import its clear/reset action as well:
@@ -17,6 +18,11 @@ export interface AuthState {
   status: 'idle' | 'loading' | 'success' | 'error';
   isLoading: boolean;
   selectedWordBookId: number | null;
+  /**
+   * Used to drive post-auth navigation (e.g. WeChat can return "login" or "register").
+   * - null: unknown / legacy flows
+   */
+  authFlow: 'login' | 'register' | null;
 }
 
 // 初始状态
@@ -28,6 +34,7 @@ const initialState: AuthState = {
   status: 'idle',
   isLoading: false,
   selectedWordBookId: null,
+  authFlow: null,
 };
 
 // 存储键名常量
@@ -107,6 +114,79 @@ export const loginUser = createAsyncThunk(
     } catch (error: any) {
       console.error('[loginUser] 错误:', error);
       return rejectWithValue(error.message || 'Server error');
+    }
+  }
+);
+
+type WechatLoginStatus = 'login' | 'register';
+
+interface WechatLoginResponse {
+  status: WechatLoginStatus;
+  access_token: string;
+  refresh_token: string;
+}
+
+interface WechatLoginPayload {
+  code: string;
+}
+
+/**
+ * WeChat login:
+ * - POST { code } to /login/wechat
+ * - Backend returns { status: "login" | "register", access_token, refresh_token }
+ */
+export const loginWithWeChat = createAsyncThunk(
+  'auth/loginWithWeChat',
+  async ({ code }: WechatLoginPayload, { rejectWithValue }) => {
+    try {
+      const url = `${API_CONFIG.BASE_URL}${API_ENDPOINTS.AUTH.WECHAT_LOGIN}`;
+      console.log('[loginWithWeChat] Request:', { url, hasCode: !!code });
+
+      const response = await fetch(url, {
+        method: 'POST',
+        // Do NOT send Authorization header here (this is a login endpoint)
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ code }),
+      });
+
+      const data = (await response.json()) as Partial<WechatLoginResponse>;
+      console.log('[loginWithWeChat] Response:', { ok: response.ok, status: data?.status });
+
+      if (!response.ok) {
+        return rejectWithValue((data as any)?.message || `WeChat login failed: ${response.status}`);
+      }
+
+      if (!data || (data.status !== 'login' && data.status !== 'register') || !data.access_token || !data.refresh_token) {
+        return rejectWithValue('Invalid WeChat login response');
+      }
+
+      // Store tokens (HttpClient also persists them)
+      const httpClient = HttpClient.getInstance();
+      await httpClient.setTokens(data.access_token, data.refresh_token);
+
+      // Create a minimal user object. We will try to infer numeric user_id from daily logs later.
+      const userData: User = {
+        id: '0',
+        username: 'wechat_user',
+        phoneNumber: '',
+        createdAt: new Date().toISOString(),
+        lastLoginAt: new Date().toISOString(),
+        password: '',
+      };
+
+      // Persist user data for restoreAuthFromStorage
+      const userDataString = SafeJsonUtils.safeStringify(userData);
+      await AsyncStorage.setItem(STORAGE_KEYS.USER_DATA, userDataString);
+
+      return {
+        user: userData,
+        access_token: data.access_token,
+        refresh_token: data.refresh_token,
+        authFlow: data.status,
+      };
+    } catch (error: any) {
+      console.error('[loginWithWeChat] Error:', error);
+      return rejectWithValue(error.message || 'WeChat login failed');
     }
   }
 );
@@ -237,6 +317,7 @@ const authSlice = createSlice({
       state.selectedWordBookId = null;
       state.error = null;
       state.status = 'idle';
+      state.authFlow = null;
     },
     setSelectedWordBookId: (state, action: PayloadAction<number | null>) => {
       state.selectedWordBookId = action.payload;
@@ -249,6 +330,7 @@ const authSlice = createSlice({
         state.loading = true;
         state.error = null;
         state.status = 'loading';
+        state.authFlow = null;
       })
       .addCase(loginUser.fulfilled, (state, action) => {
         state.loading = false;
@@ -256,12 +338,36 @@ const authSlice = createSlice({
         state.user = action.payload.user;
         state.token = action.payload.access_token;
         state.error = null;
+        state.authFlow = 'login';
         console.log('[loginUser.fulfilled] 设置用户:', state.user, '设置token:', state.token);
       })
       .addCase(loginUser.rejected, (state, action) => {
         state.loading = false;
         state.status = 'error';
         state.error = action.payload as string;
+        state.authFlow = null;
+      })
+      // WeChat 登录
+      .addCase(loginWithWeChat.pending, (state) => {
+        state.loading = true;
+        state.error = null;
+        state.status = 'loading';
+        state.authFlow = null;
+      })
+      .addCase(loginWithWeChat.fulfilled, (state, action) => {
+        state.loading = false;
+        state.status = 'success';
+        state.user = action.payload.user;
+        state.token = action.payload.access_token;
+        state.error = null;
+        state.authFlow = action.payload.authFlow;
+        console.log('[loginWithWeChat.fulfilled] authFlow:', state.authFlow);
+      })
+      .addCase(loginWithWeChat.rejected, (state, action) => {
+        state.loading = false;
+        state.status = 'error';
+        state.error = action.payload as string;
+        state.authFlow = null;
       })
       // 注册
       .addCase(registerUser.pending, (state) => {
@@ -273,6 +379,7 @@ const authSlice = createSlice({
         state.user = action.payload.user;
         state.token = action.payload.token;
         state.error = null;
+        state.authFlow = 'register';
       })
       .addCase(registerUser.rejected, (state, action) => {
         state.loading = false;

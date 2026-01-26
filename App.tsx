@@ -1,17 +1,15 @@
-import React from 'react';
+import React, { useEffect } from 'react';
+import { useColorScheme } from 'react-native';
 import { Provider } from 'react-redux';
-import { store } from './data/repository/store';
-import { SafeJsonUtils } from './utils/SafeJsonUtils';
+import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { PaperProvider } from 'react-native-paper';
 import { Slot } from 'expo-router';
-import { useColorScheme } from 'react-native';
-import { darkTheme, lightTheme } from './constants/theme';
 
-// GestureHandlerRootView can ONLY be imported from 'react-native-gesture-handler' (no such export from 'react-native').
-import { GestureHandlerRootView } from 'react-native-gesture-handler';
-import * as WeChat from 'react-native-wechat-lib';
-WeChat.registerApp('your-wechat-appid');
+import { store } from './data/repository/store';
+import { SafeJsonUtils } from './utils/SafeJsonUtils';
+import { darkTheme, lightTheme } from './constants/theme';
+import { safeRegisterWechatApp } from './utils/wechat';
 
 // 在应用启动时清理损坏的数据
 const initializeApp = async () => {
@@ -25,6 +23,15 @@ const initializeApp = async () => {
 export default function App() {
   const colorScheme = useColorScheme();
   
+  useEffect(() => {
+    // WeChat SDK registration (required before calling WeChat APIs)
+    safeRegisterWechatApp({
+      appid: 'wx778c1735212de08a',
+      // iOS required; should be a real universal link domain in production
+      universalLink: 'https://temporary_link.com/',
+    });
+  }, []);
+
   React.useEffect(() => {
     initializeApp();
   }, []);

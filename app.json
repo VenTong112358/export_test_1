@@ -5,12 +5,13 @@
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/images/icon1.png",
-    "scheme": "myapp",
+    "scheme": "wx778c1735212de08a",
     "userInterfaceStyle": "automatic",
     "newArchEnabled": true,
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "com.masterwordai.tongwenguan"
+      "bundleIdentifier": "com.masterwordai.tongwenguan",
+      "LSApplicationQueriesSchemes": ["weixin", "weixinULAPI", "weixinURLParamsAPI"]
     },
     "android": {
       "adaptiveIcon": {
@@ -35,10 +36,17 @@
           "backgroundColor": "#ffffff"
         }
       ],
+      [
+        "expo-native-wechat",
+        {
+          "androidAppId": "wx778c1735212de08a",
+          "iosAppId": "wx778c1735212de08a",
+          "universalLink": "https://yourdomain.com/"
+        }
+      ],
       "expo-secure-store",
       "expo-font",
-      "expo-web-browser",
-      "expo-wechat"
+      "expo-web-browser"
     ],
     "experiments": {
       "typedRoutes": true

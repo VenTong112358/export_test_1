@@ -41,6 +41,7 @@ export const API_ENDPOINTS = {
     LOGIN: '/logintest',
     REGISTER: '/register',
     SMS_REGISTER: '/register', // 修改为 /register
+    WECHAT_LOGIN: '/login/wechat',
     PASSWORD_RECOVERY: '/password_recovery',
     REFRESH: '/refresh', // 用于刷新access_token和refresh_token
     CHANGE_PHONE: '/change_phone_number',
