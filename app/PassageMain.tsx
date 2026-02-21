@@ -6,6 +6,7 @@ import {
   Alert,
   Animated,
   Dimensions,
+  GestureResponderEvent,
   Modal,
   Platform,
   Pressable,
@@ -47,7 +48,6 @@ import {
   searchWordEnglish,
   setShowModal
 } from '@data/usecase/WordSearchUseCase';
-import { Audio } from 'expo-av';
 import { stemmer } from 'stemmer';
 import { SentenceSelectionModal } from './components/SentenceSelectionModal';
 import { useDailyLearningLog } from './hooks/useDailyLearningLog';
@@ -106,7 +106,7 @@ const PassageMainPage: React.FC<PassageMainProps> = ({
   // 记录单词的ref
   const wordRefs = useRef<{ [id: string]: any }>({});
   // 记录sound的ref
-  const soundRef = useRef<Audio.Sound | null>(null);
+  const soundRef = useRef<any>(null);
   const { theme } = useTheme();
   const router = useRouter();
   const params = useLocalSearchParams();
@@ -173,7 +173,9 @@ const PassageMainPage: React.FC<PassageMainProps> = ({
 
   // Reading controls state
   const [fontSize, setFontSize] = useState(16);
-  const defaultLineHeight = 1.5; // 记住默认值
+  // Multiplier used as: effectiveLineHeightPx = lineHeight * fontSize.
+  // 2.0 gives roughly "one extra line" of spacing compared to 1.0.
+  const defaultLineHeight = 2.0; // 记住默认值
   const [lineHeight, setLineHeight] = useState(defaultLineHeight);
   const [hasIncreasedLineHeight, setHasIncreasedLineHeight] = useState(false); // 跟踪是否增加过
 
@@ -385,17 +387,37 @@ const PassageMainPage: React.FC<PassageMainProps> = ({
   }, [streamingContent, isStreaming]);
 
   // Handle sentence long press
-  const handleSentenceLongPress = useCallback((sentence: string, sentenceId: string) => {
+  const handleSentenceLongPress = useCallback((
+    sentence: string,
+    sentenceId: string,
+    pressEvent?: GestureResponderEvent
+  ) => {
     setSelectedSentence(sentence);
     setShowSentenceModal(true);
     // Calculate modal position
     console.log('[PassageMain] sentenceId', sentenceId);
+    const pressPoint = pressEvent?.nativeEvent
+      ? {
+          x: (pressEvent.nativeEvent as any).pageX as number,
+          y: (pressEvent.nativeEvent as any).pageY as number,
+        }
+      : null;
     const ref = sentenceRefs.current[sentenceId];
     if (ref && ref.measureInWindow) {
       ref.measureInWindow((x: number, y: number, width: number, height: number) => {
-        if (!isFinite(x) || !isFinite(y) || !isFinite(width) || !isFinite(height)) {
-          console.warn('[PassageMain] measureInWindow returned NaN, using safe defaults');
-          x = 0; y = 0; width = 0; height = 0;
+        const hasValidMeasure =
+          isFinite(x) && isFinite(y) && isFinite(width) && isFinite(height) && width > 0 && height > 0;
+        if (!hasValidMeasure && pressPoint && isFinite(pressPoint.x) && isFinite(pressPoint.y)) {
+          x = pressPoint.x;
+          y = pressPoint.y;
+          width = 0;
+          height = 0;
+        } else if (!hasValidMeasure) {
+          console.warn('[PassageMain] measureInWindow invalid, using fallback');
+          x = Dimensions.get('window').width / 2;
+          y = Dimensions.get('window').height / 2;
+          width = 0;
+          height = 0;
         }
         const GAP = 12;
         const modalMinHeight = 160;
@@ -409,6 +431,16 @@ const PassageMainPage: React.FC<PassageMainProps> = ({
             : y - modalMinHeight - GAP,
           direction,
         });
+      });
+    } else if (pressPoint) {
+      const GAP = 12;
+      const modalMinHeight = 160;
+      const windowHeight = Dimensions.get('window').height || 800;
+      const direction: 'down' | 'up' = pressPoint.y < windowHeight / 2 ? 'down' : 'up';
+      setSentenceModalPosition({
+        x: pressPoint.x,
+        y: direction === 'down' ? pressPoint.y + GAP : pressPoint.y - modalMinHeight - GAP,
+        direction,
       });
     }
   }, []);
@@ -472,7 +504,6 @@ const PassageMainPage: React.FC<PassageMainProps> = ({
         userId: logId,
         request: {
           content: sentence,
-          translation: ''
         },
         onChunk: (chunk: string) => {
           // Update content with each chunk received
@@ -639,7 +670,17 @@ const PassageMainPage: React.FC<PassageMainProps> = ({
   const isWordQueried = (word: string) => {
     return selectedWords.some(w => w.text.toLowerCase() === word.toLowerCase());
   };
-  const handleWordPress = useCallback(async (wordAnalysis: WordAnalysis, uniqueWordKey?: string) => {
+  const handleWordPress = useCallback(async (
+    wordAnalysis: WordAnalysis,
+    uniqueWordKey?: string,
+    pressEvent?: GestureResponderEvent
+  ) => {
+    const pressPoint = pressEvent?.nativeEvent
+      ? {
+          x: (pressEvent.nativeEvent as any).pageX as number,
+          y: (pressEvent.nativeEvent as any).pageY as number,
+        }
+      : null;
     // Check if word has already been queried
     const isAlreadyQueried = selectedWords.some(w => w.text === wordAnalysis.text);
 
@@ -688,8 +729,8 @@ const PassageMainPage: React.FC<PassageMainProps> = ({
       } else {
         // Fallback position
         setWordChoiceModalPosition({
-          x: Dimensions.get('window').width / 2,
-          y: Dimensions.get('window').height / 2,
+          x: pressPoint?.x ?? Dimensions.get('window').width / 2,
+          y: pressPoint?.y ?? Dimensions.get('window').height / 2,
           direction: 'down',
         });
         setShowWordChoiceModal(true);
@@ -722,11 +763,19 @@ const PassageMainPage: React.FC<PassageMainProps> = ({
 
     if (ref && ref.measureInWindow) {
       ref.measureInWindow((x: number, y: number, width: number, height: number) => {
-        if (!isFinite(x) || !isFinite(y) || !isFinite(width) || !isFinite(height)) {
-          console.warn('[WordPress] measureInWindow NaN, using fallback');
+        const measuredValid =
+          isFinite(x) && isFinite(y) && isFinite(width) && isFinite(height) && width > 0 && height > 0;
+        if (!measuredValid && pressPoint && isFinite(pressPoint.x) && isFinite(pressPoint.y)) {
+          x = pressPoint.x;
+          y = pressPoint.y;
+          width = 0;
+          height = 0;
+        } else if (!measuredValid) {
+          console.warn('[WordPress] measureInWindow invalid, using fallback');
           x = Dimensions.get('window').width / 2;
           y = Dimensions.get('window').height / 2;
-          width = 0; height = 0;
+          width = 0;
+          height = 0;
         }
         console.log('[WordPress] Position:', {
           word: wordAnalysis.text,
@@ -738,7 +787,7 @@ const PassageMainPage: React.FC<PassageMainProps> = ({
         // Calculate modal direction - default to above word
         const GAP = 8;
         const modalHeight = 120; // Modal height
-        const modalWidth = Math.min(articleWidth, 300); // Modal width
+        const modalWidth = Math.min(articleWidth || Dimensions.get('window').width, 300); // Modal width
           const windowHeight = Dimensions.get('window').height || 800;
           const windowWidth = Dimensions.get('window').width || 400;
 
@@ -753,32 +802,6 @@ const PassageMainPage: React.FC<PassageMainProps> = ({
             width: 0,
             height: 0,
             direction: 'down',
-          });
-          dispatch(setShowModal(true));
-          return;
-        }
-
-        // Special check for last paragraph issues - more lenient check
-        if (y === 0 || height === 0 || y > windowHeight - 150) {
-          console.warn('[WordPress] Last paragraph issue for word:', wordAnalysis.text);
-          // For last paragraph, use a fixed position near screen bottom
-          const modalWidth = Math.min(articleWidth, 300);
-          const modalHeight = 120;
-
-          // Calculate horizontal position based on word position in text
-          // For last paragraph, center the modal horizontally
-          const modalLeft = (windowWidth - modalWidth) / 2;
-
-          // Use a fixed position near screen bottom with good spacing
-          const modalY = windowHeight - modalHeight - 200; // 200px from bottom
-
-          setWordModalLeft(modalLeft);
-          setWordModalPosition({
-            x: windowWidth / 2, // Center horizontally
-            y: modalY,
-            width: 0,
-            height: 0,
-            direction: 'up',
           });
           dispatch(setShowModal(true));
           return;
@@ -821,12 +844,19 @@ const PassageMainPage: React.FC<PassageMainProps> = ({
       console.log('[WordPress] Ref not available, using fallback position');
       const windowHeight = Dimensions.get('window').height;
       const windowWidth = Dimensions.get('window').width;
-      const modalWidth = Math.min(articleWidth, 300);
-
-      setWordModalLeft((windowWidth - modalWidth) / 2);
+      const modalWidth = Math.min(articleWidth || windowWidth, 300);
+      const fallbackX = pressPoint?.x ?? windowWidth / 2;
+      const fallbackY = pressPoint?.y ?? windowHeight / 2;
+      let modalLeft = fallbackX - modalWidth / 2;
+      const safeHorizontalMargin = 40;
+      if (modalLeft < safeHorizontalMargin) modalLeft = safeHorizontalMargin;
+      if (modalLeft + modalWidth > windowWidth - safeHorizontalMargin) {
+        modalLeft = windowWidth - modalWidth - safeHorizontalMargin;
+      }
+      setWordModalLeft(modalLeft);
       setWordModalPosition({
-        x: windowWidth / 2,
-        y: windowHeight / 2 - 60,
+        x: fallbackX,
+        y: Math.max(60, Math.min(fallbackY - 60, windowHeight - 180)),
         width: 0,
         height: 0,
         direction: 'down',
@@ -1197,16 +1227,8 @@ const PassageMainPage: React.FC<PassageMainProps> = ({
       const url = await SpeakApi.getInstance().getSpeechUrl({ word: targetWord });
       console.log('[WordPreview] 尝试播放语音，URL:', url);
 
-             // // Use expo-av for native platforms (import dynamically to avoid load-time crashes)
-      if (!Audio) {
-        try {
-          const mod = require('expo-av');
-          Audio = mod.Audio;
-        } catch (e) {
-          console.error('[WordPreview] Failed to load expo-av:', e);
-          return;
-        }
-      }
+      // Use expo-av for native platforms (avoid assigning to imports)
+      const AudioApi = AudioModule || require('expo-av').Audio;
 
       // Unload previous sound
       if (soundRef.current) {
@@ -1214,7 +1236,7 @@ const PassageMainPage: React.FC<PassageMainProps> = ({
         soundRef.current = null;
       }
 
-      const { sound } = await Audio.Sound.createAsync({ uri: url });
+      const { sound } = await AudioApi.Sound.createAsync({ uri: url });
       soundRef.current = sound;
       await sound.playAsync();
       sound.setOnPlaybackStatusUpdate((status: any) => {
@@ -1255,16 +1277,16 @@ const PassageMainPage: React.FC<PassageMainProps> = ({
                 segment.isReviewed && showReviewedWords && styles.reviewedWordHighlight,
                 isWordQueried(segment.text) && styles.queriedWordUnderline,
               ]}
-              onPress={() => {
+              onPress={(e) => {
                 if (!/^[a-zA-Z]+$/.test(clean)) return;
                 const wa = { text: clean, type: 'known', difficulty: 'medium', frequency: 1 } as WordAnalysis;
                 // If it's a reviewed word (green highlight), show definition directly (not quiz)
                 if (segment.isReviewed && showReviewedWords) {
-                  handleWordPress(wa, key);
+                  handleWordPress(wa, key, e);
                 } else if (segment.isHighlighted) {
                   handleWordDefinition(segment.text, key);
                 } else {
-                  handleWordPress(wa, key);
+                  handleWordPress(wa, key, e);
                 }
               }}
             >
@@ -1297,17 +1319,27 @@ const PassageMainPage: React.FC<PassageMainProps> = ({
     if (uniqueParagraphs.length > 0) {
       return uniqueParagraphs.map((paragraph) => (
         <View key={paragraph.id} style={styles.paragraphContainer}>
-          {paragraph.sentences.map((sentence) => (
-            <MemoizedSentence
-              key={sentence.id}
-              sentence={sentence}
-              selectedSentence={selectedSentence}
-              renderHighlightedTextInSentence={renderHighlightedTextInSentence}
-              sentenceRefs={sentenceRefs}
-              fontSize={fontSize}
-              lineHeight={lineHeight}
-            />
-          ))}
+          {/* Render a single flowing paragraph Text, with inline sentence wrappers */}
+          <Text
+            style={[
+              styles.paragraphText,
+              { fontSize, lineHeight: lineHeight * fontSize },
+            ]}
+          >
+            {paragraph.sentences.map((sentence, idx) => (
+              <MemoizedSentence
+                key={sentence.id}
+                sentence={sentence}
+                selectedSentence={selectedSentence}
+                renderHighlightedTextInSentence={renderHighlightedTextInSentence}
+                sentenceRefs={sentenceRefs}
+                fontSize={fontSize}
+                lineHeight={lineHeight}
+                isLast={idx === paragraph.sentences.length - 1}
+                onSentenceLongPress={handleSentenceLongPress}
+              />
+            ))}
+          </Text>
         </View>
       ));
     }
@@ -1345,7 +1377,7 @@ const PassageMainPage: React.FC<PassageMainProps> = ({
             segment.isReviewed && showReviewedWords && styles.reviewedWordHighlight,
             isWordQueried(segment.text) && styles.queriedWordUnderline
           ]}
-          onPress={() => {
+          onPress={(e) => {
             // If it's a reviewed word (green highlight), show definition directly (not quiz)
             if (segment.isReviewed && showReviewedWords) {
               if (cleanWord.length > 0 && /^[a-zA-Z]+$/.test(cleanWord)) {
@@ -1356,7 +1388,7 @@ const PassageMainPage: React.FC<PassageMainProps> = ({
                   frequency: 1
                 };
                 // Pass the unique key to handleWordPress to show definition directly
-                handleWordPress(wordAnalysis, uniqueWordKey);
+                handleWordPress(wordAnalysis, uniqueWordKey, e);
               }
             } else if (!segment.isHighlighted) {
               if (cleanWord.length > 0 && /^[a-zA-Z]+$/.test(cleanWord)) {
@@ -1367,7 +1399,7 @@ const PassageMainPage: React.FC<PassageMainProps> = ({
                   frequency: 1
                 };
                 // Pass the unique key to handleWordPress
-                handleWordPress(wordAnalysis, uniqueWordKey);
+                handleWordPress(wordAnalysis, uniqueWordKey, e);
               }
             } else {
               console.log('[PassageMain] segment.text', segment.text);
@@ -1375,8 +1407,9 @@ const PassageMainPage: React.FC<PassageMainProps> = ({
               handleWordDefinition(segment.text, uniqueWordKey);
             }
           }}
-          onLongPress={() => handleSentenceLongPress(sentenceText, sentenceId)}
-          delayLongPress={800}
+          // Important: long-press must be on the leaf Text nodes as well.
+          // Parent sentence Text often won't receive long-press when children handle presses.
+          onLongPress={(e) => handleSentenceLongPress(sentenceText, sentenceId, e)}
         >
           {segment.text}
         </Text>
@@ -1391,7 +1424,7 @@ const PassageMainPage: React.FC<PassageMainProps> = ({
     <TouchableOpacity
       key={word.text}
       style={styles.wordContainer}
-      onPress={() => handleWordPress(word)}
+      onPress={(e) => handleWordPress(word, undefined, e)}
     >
       <Text style={styles.wordText}>{word.text}</Text>
     </TouchableOpacity>
@@ -1512,8 +1545,9 @@ const PassageMainPage: React.FC<PassageMainProps> = ({
             bounces={true}
             onLayout={(event) => {
               const { width, x } = event.nativeEvent.layout;
-              setArticleWidth(width);
-              setArticleX(x);
+              // Guard against layout-driven render loops (onLayout can fire frequently during streaming).
+              setArticleWidth(prev => (prev === width ? prev : width));
+              setArticleX(prev => (prev === x ? prev : x));
             }}
           >
             {/* Title Section */}
@@ -2550,15 +2584,20 @@ const styles = StyleSheet.create({
     marginBottom: height * 0.02,
     width: '100%',
   },
+  paragraphText: {
+    color: '#333',
+    fontFamily: Platform.select({ ios: 'Inter', android: 'sans-serif' }),
+    flexWrap: 'wrap',
+  },
   sentenceWrapper: {
+    // Keep for backward compatibility; no longer used for layout.
     flexDirection: 'row',
     flexWrap: 'wrap',
-    width: '100%',
     paddingVertical: height * 0.005,
   },
   sentenceContainer: {
+    // Keep for backward compatibility; no longer used for layout.
     paddingVertical: height * 0.005,
-    width: '100%',
   },
   sentenceText: {
     color: '#333',
@@ -2748,6 +2787,8 @@ const MemoizedSentence = React.memo(({
                                        sentenceRefs,
                                        fontSize,
                                        lineHeight,
+                                       isLast,
+                                       onSentenceLongPress,
                                      }: {
   sentence: { id: string; text: string };
   selectedSentence: string;
@@ -2755,31 +2796,35 @@ const MemoizedSentence = React.memo(({
   sentenceRefs: React.MutableRefObject<{ [id: string]: any }>;
   fontSize: number;
   lineHeight: number;
+  isLast?: boolean;
+  onSentenceLongPress: (sentence: string, sentenceId: string, pressEvent?: GestureResponderEvent) => void;
 }) => {
   return (
-      <TouchableOpacity
-          key={sentence.id}
-          activeOpacity={0.8}
-          style={[
-            styles.sentenceWrapper,
-            selectedSentence === sentence.text && styles.selectedSentenceContainer,
-          ]}
+    <>
+      {/* Sentence wrapper as inline Text to preserve natural paragraph flow */}
+      <Text
+        ref={(ref) => {
+          sentenceRefs.current[sentence.id] = ref;
+        }}
+        style={[
+          styles.sentenceText,
+          { fontSize, lineHeight: lineHeight * fontSize },
+          selectedSentence === sentence.text && styles.selectedSentenceText,
+        ]}
+        onLongPress={(e) => {
+          // Use the whole sentence as the selection target
+          onSentenceLongPress(sentence.text, sentence.id, e);
+        }}
       >
-        <Text
-            ref={(ref) => {
-              sentenceRefs.current[sentence.id] = ref;
-            }}
-            style={[
-              styles.sentenceText,
-              { fontSize, lineHeight: lineHeight * fontSize },
-              selectedSentence === sentence.text && styles.selectedSentenceText,
-            ]}
-        >
-          {renderHighlightedTextInSentence(sentence.text, sentence.id)}
-        </Text>
-      </TouchableOpacity>
+        {renderHighlightedTextInSentence(sentence.text, sentence.id)}
+        {/* Ensure sentences don't "stick" together after trimming */}
+        {!isLast ? ' ' : ''}
+      </Text>
+      {/* Preserve paragraph breaks naturally; do nothing here (paragraph handled by container) */}
+    </>
   );
 });
 
 // Export as a named export for backward compatibility
 export { PassageMainPage as PassageMain };
+

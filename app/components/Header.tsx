@@ -1,8 +1,8 @@
-import React from 'react';
-import { View, Text, TouchableOpacity, StyleSheet, Dimensions, Platform } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { useRouter } from 'expo-router';
 import { useTheme } from '@hooks/useTheme';
+import { useRouter } from 'expo-router';
+import React from 'react';
+import { Dimensions, Platform, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 
 const { width, height } = Dimensions.get('window');
 
@@ -92,7 +92,7 @@ export const Header: React.FC<HeaderProps> = ({
       </View>
 
       {/* Title */}
-      <Text style={[styles.headerTitle, { color: titleColor }]}>
+      <Text pointerEvents="none" style={[styles.headerTitle, { color: titleColor }]}>
         {title}
       </Text>
 
@@ -118,6 +118,7 @@ export const Header: React.FC<HeaderProps> = ({
 
 const styles = StyleSheet.create({
   header: {
+    position: 'relative',
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
@@ -135,7 +136,10 @@ const styles = StyleSheet.create({
     fontSize: 20,
     fontFamily: Platform.select({ ios: 'DM Sans', android: 'sans-serif' }),
     fontWeight: '700',
-    flex: 1,
+    position: 'absolute',
+    left: 0,
+    right: 0,
+    paddingHorizontal: 80, // avoid overlapping left/right buttons
     textAlign: 'center',
   },
   leftButton: {
@@ -145,9 +149,9 @@ const styles = StyleSheet.create({
   rightButton: {
     minWidth: 40,
     alignItems: 'flex-end',
-    // 增加宽度以容纳5个控制按钮
-    width: 'auto',
-    maxWidth: 200,
+    flexDirection: 'row',
+    justifyContent: 'flex-end',
+    flexShrink: 0,
   },
   button: {
     padding: 8,

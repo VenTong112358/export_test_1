@@ -1,14 +1,14 @@
 import { Ionicons } from '@expo/vector-icons';
 import React, { useEffect, useRef, useState } from 'react';
 import {
-  Alert,
-  Animated,
-  Dimensions,
-  Share,
-  StyleSheet,
-  Text,
-  TouchableOpacity,
-  View
+    Alert,
+    Animated,
+    Dimensions,
+    Share,
+    StyleSheet,
+    Text,
+    TouchableOpacity,
+    View
 } from 'react-native';
 import Svg, { ClipPath, Defs, G, Mask, Path, Rect } from 'react-native-svg';
 import { TranslationToggle } from './TranslationToggle';
@@ -145,6 +145,9 @@ export const HeaderReadingControls: React.FC<HeaderReadingControlsProps> = ({
 }) => {
   const [showFontModal, setShowFontModal] = useState(false);
   const [buttonLayout, setButtonLayout] = useState({ x: 0, y: 0, width: 0, height: 0 });
+  // Avoid render loops: onLayout can fire repeatedly during layout passes.
+  // We only commit state updates if the values actually changed (within a small epsilon).
+  const LAYOUT_EPSILON = 0.5;
 
   // 计算弹窗位置
   const calculatePopupPosition = () => {
@@ -219,7 +222,14 @@ export const HeaderReadingControls: React.FC<HeaderReadingControlsProps> = ({
 
   const onButtonLayout = (event: any) => {
     const { x, y, width, height } = event.nativeEvent.layout;
-    setButtonLayout({ x, y, width, height });
+    setButtonLayout(prev => {
+      const same =
+        Math.abs(prev.x - x) < LAYOUT_EPSILON &&
+        Math.abs(prev.y - y) < LAYOUT_EPSILON &&
+        Math.abs(prev.width - width) < LAYOUT_EPSILON &&
+        Math.abs(prev.height - height) < LAYOUT_EPSILON;
+      return same ? prev : { x, y, width, height };
+    });
   };
 
   const handleShare = async () => {
@@ -364,8 +374,11 @@ const styles = StyleSheet.create({
   container: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'space-between',
+    // Pack controls so they don't "spread" into the screen edge and get clipped.
+    justifyContent: 'flex-end',
     paddingHorizontal: 4,
+    flexShrink: 0,
+    maxWidth: '100%',
   },
   controlButton: {
     width: 32,

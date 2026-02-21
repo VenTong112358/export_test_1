@@ -89,8 +89,10 @@ export const SentenceSelectionModal: React.FC<SentenceSelectionModalProps> = ({
   const safeTopMargin = 120; // Top safe margin
   const safeBottomMargin = 120; // Bottom safe margin
 
-  // Calculate modal position to be centered horizontally
-  let modalX = (width - modalWidth) / 2;
+  // Calculate modal position anchored to the press/selection X.
+  // Keep within screen bounds with padding.
+  const clamp = (n: number, min: number, max: number) => Math.max(min, Math.min(max, n));
+  let modalX = clamp(position.x - modalWidth / 2, padding, width - modalWidth - padding);
   let modalY = position.y; // Already calculated as top or bottom in parent
 
   // Smarter boundary handling
@@ -103,11 +105,8 @@ export const SentenceSelectionModal: React.FC<SentenceSelectionModalProps> = ({
     modalY = safeTopMargin;
   }
   
-  // Special check for last paragraph issues - more lenient check
-  if (position.y > height - 200) {
-    // If position is within 200px of screen bottom, use safe position near bottom
-    modalY = height - modalMinHeight - 200; // Increased from 150 to 200px
-  }
+  // Compute triangle X within modal bounds (triangle base is 24px wide).
+  const triangleLeft = clamp(position.x - 12, modalX + 12, modalX + modalWidth - 24);
 
   // Handle translate with streaming
   const handleTranslate = () => {
@@ -179,7 +178,7 @@ export const SentenceSelectionModal: React.FC<SentenceSelectionModalProps> = ({
           onPress={onClose}
         />
         {direction === 'down' && (
-          <View style={{ position: 'absolute', left: modalX + modalWidth / 2 - 12, top: modalY - 12, width: 0, height: 0, zIndex: 10 }}>
+          <View style={{ position: 'absolute', left: triangleLeft, top: modalY - 12, width: 0, height: 0, zIndex: 10 }}>
             <View style={styles.triangle} />
           </View>
         )}
@@ -236,7 +235,7 @@ export const SentenceSelectionModal: React.FC<SentenceSelectionModalProps> = ({
           </View>
         </View>
         {direction === 'up' && (
-          <View style={{ position: 'absolute', left: modalX + modalWidth / 2 - 12, top: modalY + modalMinHeight, width: 0, height: 0, zIndex: 10 }}>
+          <View style={{ position: 'absolute', left: triangleLeft, top: modalY + modalMinHeight, width: 0, height: 0, zIndex: 10 }}>
             <View style={[styles.triangle, { transform: [{ rotate: '180deg' }] }]} />
           </View>
         )}
