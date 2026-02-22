@@ -1,15 +1,15 @@
+import { safeRegisterWechatApp } from '@/utils/wechat';
 import { lightTheme } from '@constants/theme';
 import { HttpClient } from '@data/api/HttpClient';
 import { RootState, store } from '@data/repository/store';
 import { useAuth } from '@hooks/useAuth';
 import { usePrivacyPolicyAgreement } from '@hooks/usePrivacyPolicyAgreement';
-import { Slot, useRouter } from 'expo-router';
+import { Stack, useRouter } from 'expo-router';
 import { useEffect, useState } from 'react';
 import { ActivityIndicator, View } from 'react-native';
 import { PaperProvider } from 'react-native-paper';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { Provider, useSelector } from 'react-redux';
-import { safeRegisterWechatApp } from '@/utils/wechat';
 
 function AuthWrapper() {
   const { restoreAuthFromStorage, checkTokenValidity } = useAuth();
@@ -107,7 +107,7 @@ function AuthWrapper() {
       </View>
     );
   }
-  return <Slot />;
+  return <Stack screenOptions={{ headerShown: false }} />;
 }
 
 export default function RootLayout() {

@@ -1,14 +1,16 @@
 import { Ionicons } from '@expo/vector-icons';
 import React, { useEffect, useRef, useState } from 'react';
 import {
-    Alert,
-    Animated,
-    Dimensions,
-    Share,
-    StyleSheet,
-    Text,
-    TouchableOpacity,
-    View
+  Alert,
+  Animated,
+  Dimensions,
+  Modal,
+  Pressable,
+  Share,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View
 } from 'react-native';
 import Svg, { ClipPath, Defs, G, Mask, Path, Rect } from 'react-native-svg';
 import { TranslationToggle } from './TranslationToggle';
@@ -144,23 +146,8 @@ export const HeaderReadingControls: React.FC<HeaderReadingControlsProps> = ({
   onReviewedWordsToggle,
 }) => {
   const [showFontModal, setShowFontModal] = useState(false);
-  const [buttonLayout, setButtonLayout] = useState({ x: 0, y: 0, width: 0, height: 0 });
-  // Avoid render loops: onLayout can fire repeatedly during layout passes.
-  // We only commit state updates if the values actually changed (within a small epsilon).
-  const LAYOUT_EPSILON = 0.5;
-
-  // 计算弹窗位置
-  const calculatePopupPosition = () => {
-    const screenWidth = Dimensions.get('window').width;
-    // 计算实际宽度：4个按钮(32px) + 按钮margin(2*2*4=16px) + 3个间距(4px) + padding(16px)
-    const popupWidth = 4 * 32 + 2 * 2 * 4 + 3 * 4 + 16; // 172px
-    const rightMargin = 32; // 右边距，确保窗口完全显示
-    const calculatedLeft = Math.min(
-      buttonLayout.x,
-      screenWidth - popupWidth - rightMargin // 留出足够的右边距
-    );
-    return Math.max(16, calculatedLeft); // 确保至少距离左边界16px
-  };
+  const [popupPos, setPopupPos] = useState({ top: 0, left: 0 });
+  const fontButtonRef = useRef<View>(null);
 
   const increaseFontSize = () => {
     console.log('[HeaderReadingControls] increaseFontSize called, current fontSize:', fontSize);
@@ -216,20 +203,21 @@ export const HeaderReadingControls: React.FC<HeaderReadingControlsProps> = ({
   };
 
   const handleFontButtonPress = () => {
-    console.log('[HeaderReadingControls] Font button pressed, opening modal');
-    setShowFontModal(true);
-  };
+    const POPUP_WIDTH = 172;
+    const screenWidth = Dimensions.get('window').width;
 
-  const onButtonLayout = (event: any) => {
-    const { x, y, width, height } = event.nativeEvent.layout;
-    setButtonLayout(prev => {
-      const same =
-        Math.abs(prev.x - x) < LAYOUT_EPSILON &&
-        Math.abs(prev.y - y) < LAYOUT_EPSILON &&
-        Math.abs(prev.width - width) < LAYOUT_EPSILON &&
-        Math.abs(prev.height - height) < LAYOUT_EPSILON;
-      return same ? prev : { x, y, width, height };
-    });
+    if (fontButtonRef.current) {
+      fontButtonRef.current.measureInWindow((x, y, w, h) => {
+        let left = x + w / 2 - POPUP_WIDTH / 2;
+        if (left + POPUP_WIDTH > screenWidth - 16) left = screenWidth - POPUP_WIDTH - 16;
+        if (left < 16) left = 16;
+        setPopupPos({ top: y + h + 8, left });
+        setShowFontModal(true);
+      });
+    } else {
+      setPopupPos({ top: 80, left: screenWidth - POPUP_WIDTH - 16 });
+      setShowFontModal(true);
+    }
   };
 
   const handleShare = async () => {
@@ -257,6 +245,7 @@ export const HeaderReadingControls: React.FC<HeaderReadingControlsProps> = ({
     }
   };
 
+
   return (
     <View style={styles.container}>
       {/* Timer icon button - added next to font size button */}
@@ -269,70 +258,67 @@ export const HeaderReadingControls: React.FC<HeaderReadingControlsProps> = ({
 
       {/* 字体大小按钮 - 点击弹出选项窗口 */}
       <TouchableOpacity
+        ref={fontButtonRef}
         style={styles.controlButton} 
         onPress={handleFontButtonPress}
-        onLayout={onButtonLayout}
       >
         <FontSizeIcon size={22} color="#333" />
       </TouchableOpacity>
 
-      {/* 点击外部关闭弹窗的透明遮罩 */}
-      {showFontModal && (
-        <TouchableOpacity 
-          style={styles.overlayTouch}
-          onPress={() => {
-            console.log('[HeaderReadingControls] Overlay touched, closing modal');
-            setShowFontModal(false);
-          }}
-          activeOpacity={1}
-        />
-      )}
+      {/* 字体设置弹出窗口 (Modal so it's not clipped by Header) */}
+      <Modal
+        visible={showFontModal}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setShowFontModal(false)}
+      >
+        <Pressable
+          style={styles.modalOverlay}
+          onPress={() => setShowFontModal(false)}
+        >
+          <View
+            style={[styles.dropdownContainer, { top: popupPos.top, left: popupPos.left }]}
+          >
+            <View style={styles.buttonRow}>
+              <TouchableOpacity
+                style={styles.compactButton}
+                onPress={increaseFontSize}
+                activeOpacity={0.7}
+              >
+                <Text style={styles.compactButtonText}>A+</Text>
+              </TouchableOpacity>
 
-      {/* 字体设置弹出窗口 */}
-      {showFontModal && (
-        <View style={[styles.dropdownContainer, {
-          top: buttonLayout.y + buttonLayout.height + 8,
-          left: calculatePopupPosition(),
-        }]}>
-          <View style={styles.buttonRow}>
-            <TouchableOpacity 
-              style={styles.compactButton} 
-              onPress={increaseFontSize}
-              activeOpacity={0.7}
-            >
-              <Text style={styles.compactButtonText}>A+</Text>
-            </TouchableOpacity>
-            
-            <TouchableOpacity 
-              style={styles.compactButton} 
-              onPress={decreaseFontSize}
-              activeOpacity={0.7}
-            >
-              <Text style={styles.compactButtonText}>A-</Text>
-            </TouchableOpacity>
-            
-            <TouchableOpacity 
-              style={styles.compactButton} 
-              onPress={increaseLineHeight}
-              activeOpacity={0.7}
-            >
-              <Text style={styles.compactButtonText}>H+</Text>
-            </TouchableOpacity>
-            
-            <TouchableOpacity 
-              style={styles.compactButton} 
-              onPress={decreaseLineHeight}
-              activeOpacity={0.7}
-              disabled={!hasIncreasedLineHeight || lineHeight <= defaultLineHeight}
-            >
-              <Text style={[
-                styles.compactButtonText,
-                (!hasIncreasedLineHeight || lineHeight <= defaultLineHeight) && styles.disabledButtonText
-              ]}>H-</Text>
-            </TouchableOpacity>
+              <TouchableOpacity
+                style={styles.compactButton}
+                onPress={decreaseFontSize}
+                activeOpacity={0.7}
+              >
+                <Text style={styles.compactButtonText}>A-</Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={styles.compactButton}
+                onPress={increaseLineHeight}
+                activeOpacity={0.7}
+              >
+                <Text style={styles.compactButtonText}>H+</Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={styles.compactButton}
+                onPress={decreaseLineHeight}
+                activeOpacity={0.7}
+                disabled={!hasIncreasedLineHeight || lineHeight <= defaultLineHeight}
+              >
+                <Text style={[
+                  styles.compactButtonText,
+                  (!hasIncreasedLineHeight || lineHeight <= defaultLineHeight) && styles.disabledButtonText
+                ]}>H-</Text>
+              </TouchableOpacity>
+            </View>
           </View>
-        </View>
-      )}
+        </Pressable>
+      </Modal>
 
       {/* 新的中英文翻译切换组件 */}
       <TranslationToggle 
@@ -395,30 +381,21 @@ const styles = StyleSheet.create({
   shareButton: {
     // 移除不规范的样式属性
   },
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'transparent',
+  },
   dropdownContainer: {
     position: 'absolute',
     backgroundColor: 'white',
     borderRadius: 12,
     padding: 8,
-    width: 4 * 32 + 2 * 2 * 4 + 3 * 4 + 16, // 4个按钮(32px) + 按钮margin(16px) + 3个间距(4px) + padding(16px) = 172px
+    width: 172,
     shadowColor: '#000',
-    shadowOffset: {
-      width: 0,
-      height: 2,
-    },
+    shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.25,
     shadowRadius: 3.84,
     elevation: 25,
-    zIndex: 9999, // 大幅提高弹窗层级
-  },
-  overlayTouch: {
-    position: 'absolute',
-    top: -1000,
-    left: -1000,
-    right: -1000,
-    bottom: -1000,
-    zIndex: 9998, // 提高遮罩层级但低于弹窗
-    backgroundColor: 'transparent',
   },
   buttonRow: {
     flexDirection: 'row',
@@ -434,8 +411,6 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     backgroundColor: 'rgba(0, 0, 0, 0.05)',
     marginHorizontal: 2,
-    elevation: 30,
-    zIndex: 10000, // 确保按钮在最上层
   },
   compactButtonText: {
     fontSize: 12,

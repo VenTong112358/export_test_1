@@ -1,5 +1,5 @@
-import { HttpClient } from './HttpClient';
 import { API_CONFIG, API_ENDPOINTS } from './ApiConfig';
+import { HttpClient } from './HttpClient';
 
 export interface SpeakApiOptions {
   word: string;
@@ -53,19 +53,16 @@ export class SpeakApi {
     const { word, voice } = options;
 
     try {
-      // 构建URL参数
       const params = new URLSearchParams({
-        word: encodeURIComponent(word),
+        word,
         ...(voice && { voice })
       });
 
-
-
-      // 获取认证token
       const token = this.httpClient.getAccessToken();
-      const authParam = token ? `/token=${encodeURIComponent(token)}` : '';
+      if (token) {
+        params.append('token', token);
+      }
 
-      // 返回带认证的音频URL
       return `${this.baseURL}${API_ENDPOINTS.SPEAK}2?${params.toString()}`;
     } catch (error) {
       console.error('[SpeakApi] Error generating speech URL:', error);

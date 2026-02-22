@@ -1,14 +1,14 @@
-import React, { useState } from 'react';
-import { Alert, StyleSheet, ScrollView, View, Dimensions, Platform } from 'react-native';
-import { TextInput, Button, Text } from 'react-native-paper';
-import { useDispatch, useSelector } from 'react-redux';
-import { useRouter } from 'expo-router';
-import AsyncStorage from '@react-native-async-storage/async-storage';
-import { loginUser, loginWithWeChat, setUser, STORAGE_KEYS } from '@data/usecase/UserUseCase';
-import { clearDailyLearningLogsCache, fetchDailyLearningLogs, resetLogs } from '@data/usecase/DailyLearningLogsUseCase';
-import { useTheme } from '@hooks/useTheme';
-import { RootState, AppDispatch } from '@data/repository/store';
 import { safeIsWechatInstalled, safeSendWechatAuthRequest } from '@/utils/wechat';
+import { AppDispatch, RootState } from '@data/repository/store';
+import { clearDailyLearningLogsCache, fetchDailyLearningLogs, resetLogs } from '@data/usecase/DailyLearningLogsUseCase';
+import { loginUser, loginWithWeChat, setUser, STORAGE_KEYS } from '@data/usecase/UserUseCase';
+import { useTheme } from '@hooks/useTheme';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import { useRouter } from 'expo-router';
+import { useState } from 'react';
+import { Alert, Dimensions, Platform, ScrollView, StyleSheet, View } from 'react-native';
+import { Button, Text, TextInput } from 'react-native-paper';
+import { useDispatch, useSelector } from 'react-redux';
 
 const { width, height } = Dimensions.get('window');
 
@@ -27,7 +27,7 @@ export default function LoginScreen() {
 
   const handleLogin = async () => {
     if (!username || !password) {
-      setFormError('Please enter your username and password');
+      setFormError('请输入用户名和密码');
       return;
     }
     setFormError('');
@@ -36,13 +36,13 @@ export default function LoginScreen() {
       router.replace('/(tabs)/MainPage' as any);
       setShowTestButton(true);
     } catch (e: any) {
-      setFormError(e?.message || e || 'Login failed');
+      setFormError(e?.message || e || '登录失败');
     }
   };
 
   const handleWeChatLogin = async () => {
     if (Platform.OS === 'web') {
-      setFormError('WeChat login is not supported on web');
+      setFormError('网页端不支持微信登录');
       return;
     }
     if (wechatLoading || loading) return;
@@ -101,7 +101,7 @@ export default function LoginScreen() {
         router.replace('/(auth)/onboarding-wordbook' as any);
       }
     } catch (e: any) {
-      const msg = e?.message || e || 'WeChat login failed';
+      const msg = e?.message || e || '微信登录失败';
       const str = String(msg);
       setFormError(str);
       if (str.includes("Cannot find native module 'ExpoNativeWechat'")) {
@@ -132,8 +132,8 @@ export default function LoginScreen() {
       <View style={styles.content}>
         {/* Title Section */}
         <View style={styles.titleSection}>
-          <Text style={styles.title}>Login</Text>
-          <Text style={styles.subtitle}>Welcome back! Log in to resume your reading journey.</Text>
+          <Text style={styles.title}>登录</Text>
+          <Text style={styles.subtitle}>欢迎回来！登录以继续你的阅读之旅。</Text>
         </View>
         {formError ? (
           <Text style={styles.error}>{formError}</Text>
@@ -141,7 +141,7 @@ export default function LoginScreen() {
         {/* Username Input */}
         <View style={styles.inputSection}>
           <View style={styles.inputLabel}>
-            <Text style={styles.labelText}>User ID</Text>
+            <Text style={styles.labelText}>用户名</Text>
           </View>
           <TextInput
             value={username}
@@ -151,14 +151,14 @@ export default function LoginScreen() {
             contentStyle={styles.inputContent}
             outlineStyle={styles.inputOutline}
             autoCapitalize="none"
-            placeholder="Enter your username"
+            placeholder="请输入用户名"
             placeholderTextColor="#B0B0B0"
           />
         </View>
         {/* Password Input */}
         <View style={styles.inputSection}>
           <View style={styles.inputLabel}>
-            <Text style={styles.labelText}>Password</Text>
+            <Text style={styles.labelText}>密码</Text>
           </View>
           <TextInput
             value={password}
@@ -169,14 +169,14 @@ export default function LoginScreen() {
             outlineStyle={styles.inputOutline}
             secureTextEntry={!showPassword}
             right={<TextInput.Icon icon={showPassword ? 'eye-off' : 'eye'} onPress={() => setShowPassword(v => !v)} />}
-            placeholder="Enter your password"
+            placeholder="请输入密码"
             placeholderTextColor="#B0B0B0"
           />
         </View>
         {/* Forget Password */}
         <View style={styles.forgetPasswordContainer}>
           <Button labelStyle={{ color: '#838589' }} mode="text" onPress={() => router.push('/forgot' as any)}>
-            Forgot password?
+            忘记密码？
           </Button>
         </View>
         {/* Login Button */}
@@ -189,16 +189,19 @@ export default function LoginScreen() {
           loading={loading}
           disabled={loading || wechatLoading}
         >
-          Login
+          登录
         </Button>
         <Button
           mode="contained"
+          icon="wechat"
           style={[styles.loginButton, styles.wechatButton, { marginTop: 0 }]}
+          contentStyle={styles.loginButtonContent}
+          labelStyle={styles.loginButtonLabel}
           onPress={handleWeChatLogin}
           loading={wechatLoading}
           disabled={loading || wechatLoading}
         >
-          WeChat Login
+          微信登录
         </Button>
         {showTestButton && (
           <Button
@@ -215,7 +218,7 @@ export default function LoginScreen() {
           style={styles.button}
           labelStyle={{ color: '#838589' }}
         >
-          Don't have an account? Register
+          没有账号？去注册
         </Button>
       </View>
     </ScrollView>
@@ -225,12 +228,11 @@ export default function LoginScreen() {
 const styles = StyleSheet.create({
   container: {
     flexGrow: 1,
+    justifyContent: 'center',
     backgroundColor: '#FFFBF8',
   },
   content: {
-    flex: 1,
     paddingHorizontal: width * 0.12,
-    paddingTop: height * 0.20,
   },
   titleSection: {
     marginBottom: height * 0.04,

@@ -1,11 +1,17 @@
 import { PrivacyPolicyModal } from '@/app/components/PrivacyPolicyModal';
+import { safeIsWechatInstalled, safeSendWechatAuthRequest } from '@/utils/wechat';
 import { SmsApi } from '@data/api/SmsApi';
+import { AppDispatch } from '@data/repository/store';
+import { clearDailyLearningLogsCache, fetchDailyLearningLogs, resetLogs } from '@data/usecase/DailyLearningLogsUseCase';
+import { loginWithWeChat, setUser, STORAGE_KEYS } from '@data/usecase/UserUseCase';
 import { usePrivacyPolicyAgreement } from '@hooks/usePrivacyPolicyAgreement';
 import { useTheme } from '@hooks/useTheme';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useRouter } from 'expo-router';
 import { useEffect, useState } from 'react';
-import { BackHandler, Dimensions, Linking, Platform, ScrollView, StyleSheet, TouchableOpacity, View } from 'react-native';
+import { Alert, BackHandler, Dimensions, Linking, Platform, ScrollView, StyleSheet, TouchableOpacity, View } from 'react-native';
 import { Button, Checkbox, Text, TextInput } from 'react-native-paper';
+import { useDispatch } from 'react-redux';
 
 const { width, height } = Dimensions.get('window');
 
@@ -19,8 +25,10 @@ export default function RegisterScreen() {
   const [acceptedTerms, setAcceptedTerms] = useState(false);
   const [formError, setFormError] = useState('');
   const [smsLoading, setSmsLoading] = useState(false);
+  const [wechatLoading, setWechatLoading] = useState(false);
   const [showPrivacyModal, setShowPrivacyModal] = useState(false);
   
+  const dispatch = useDispatch<AppDispatch>();
   const { theme } = useTheme();
   const router = useRouter();
   const smsApi = SmsApi.getInstance();
@@ -46,6 +54,7 @@ export default function RegisterScreen() {
     try {
       await acceptPrivacyPolicy();
       setShowPrivacyModal(false);
+      setAcceptedTerms(true);
     } catch (error) {
       console.error('Error accepting privacy policy:', error);
       setFormError('无法保存隐私政策同意状态，请重试');
@@ -107,6 +116,74 @@ export default function RegisterScreen() {
       setFormError(error.message || '发送验证码失败');
     } finally {
       setSmsLoading(false);
+    }
+  };
+
+  const handleWeChatRegister = async () => {
+    if (Platform.OS === 'web') {
+      setFormError('网页端不支持微信登录');
+      return;
+    }
+    if (wechatLoading || smsLoading) return;
+
+    setWechatLoading(true);
+    setFormError('');
+    try {
+      const installed = await safeIsWechatInstalled();
+      if (!installed) {
+        Alert.alert('微信未安装', '请先安装微信后再使用微信注册');
+        return;
+      }
+
+      const authResp = await safeSendWechatAuthRequest({ scope: 'snsapi_userinfo', state: 'masterwordai' });
+      const code = authResp?.data?.code;
+      if (!code) {
+        throw new Error('微信授权未返回 code');
+      }
+
+      dispatch(resetLogs());
+      dispatch(clearDailyLearningLogsCache());
+
+      const result = await dispatch(loginWithWeChat({ code })).unwrap();
+
+      if (result.authFlow === 'login') {
+        const logsResp = await dispatch(fetchDailyLearningLogs(result.user.username)).unwrap();
+        const inferredUserId =
+          Array.isArray((logsResp as any)?.logs) && (logsResp as any).logs.length > 0
+            ? (logsResp as any).logs[0]?.user_id
+            : undefined;
+
+        if (inferredUserId) {
+          const updatedUser = {
+            ...result.user,
+            id: String(inferredUserId),
+            username: result.user.username === 'wechat_user' ? `wechat_${inferredUserId}` : result.user.username,
+          };
+          dispatch(setUser(updatedUser));
+          await AsyncStorage.setItem(STORAGE_KEYS.USER_DATA, JSON.stringify(updatedUser));
+        }
+
+        router.replace('/(tabs)/MainPage' as any);
+      } else {
+        router.replace('/(auth)/onboarding-wordbook' as any);
+      }
+    } catch (e: any) {
+      const msg = e?.message || e || '微信注册失败';
+      const str = String(msg);
+      setFormError(str);
+      if (str.includes("Cannot find native module 'ExpoNativeWechat'")) {
+        Alert.alert(
+          '微信登录不可用',
+          '当前安装包未包含微信原生模块。\n\n请用 Development Build 运行：\n- Android: `npm run android`\n- iOS: `npm run ios`'
+        );
+      } else if (str.includes('SendAuthResp timed out')) {
+        Alert.alert(
+          '微信登录超时',
+          '已发起微信授权请求，但未收到回调。\n\n请检查微信开放平台配置是否匹配当前安装包。'
+        );
+      }
+    } finally {
+      setWechatLoading(false);
     }
   };
 
@@ -224,6 +301,19 @@ export default function RegisterScreen() {
         >
           发送验证码
         </Button>
+        {/* WeChat Register Button */}
+        <Button
+          mode="contained"
+          icon="wechat"
+          onPress={handleWeChatRegister}
+          style={styles.wechatButton}
+          contentStyle={styles.registerButtonContent}
+          labelStyle={styles.registerButtonLabel}
+          loading={wechatLoading}
+          disabled={smsLoading || wechatLoading}
+        >
+          微信注册
+        </Button>
         {/* Go to Login Button */}
         <Button
           mode="text"
@@ -242,12 +332,11 @@ export default function RegisterScreen() {
 const styles = StyleSheet.create({
   container: {
     flexGrow: 1,
+    justifyContent: 'center',
     backgroundColor: '#FFFBF8',
   },
   content: {
-    flex: 1,
     paddingHorizontal: width * 0.12,
-    paddingTop: height * 0.20,
   },
   titleSection: {
     marginBottom: height * 0.04,
@@ -309,6 +398,16 @@ const styles = StyleSheet.create({
     fontSize: 18,
     fontFamily: Platform.select({ ios: 'DM Sans', android: 'sans-serif' }),
     fontWeight: '700',
+  },
+  wechatButton: {
+    backgroundColor: '#07C160',
+    borderRadius: 12,
+    marginBottom: height * 0.03,
+    shadowColor: '#07C160',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 5,
   },
   button: {
     marginTop: 8,

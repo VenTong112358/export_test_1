@@ -34,7 +34,10 @@ import {
   setSelectedWord,
   setSelectedWords,
   setSessionId,
-  translateWord
+  setStreamingComplete,
+  startStreaming,
+  translateWord,
+  updateStreamingContent,
 } from '@data/usecase/ArticleUseCase';
 import { updateLogStatus } from '@data/usecase/DailyLearningLogsUseCase';
 import { fetchSavedArticles } from '@data/usecase/SavedArticlesUseCase';
@@ -48,11 +51,11 @@ import {
   searchWordEnglish,
   setShowModal
 } from '@data/usecase/WordSearchUseCase';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { stemmer } from 'stemmer';
 import { SentenceSelectionModal } from './components/SentenceSelectionModal';
 import { useDailyLearningLog } from './hooks/useDailyLearningLog';
 import { useStreamingHighlighter } from './hooks/useStreamingHighlighter';
-// import { ArticleCacheService } from '@data/sqlite/Database';
 
 // Import sentence splitter hook
 import { SpeakApi } from '@data/api/SpeakApi';
@@ -64,8 +67,23 @@ let AudioModule: any = null;
 if (Platform.OS !== 'web') {
   AudioModule = require('expo-av').Audio;
 }
-// import { Dimensions } from 'react-native';
 const { width, height } = Dimensions.get('window');
+
+const ArticleCache = {
+  _key: (logId: number) => `@article_cache_${logId}`,
+  async get(logId: number): Promise<{ content: string; title?: string; generated_at: string } | null> {
+    try {
+      const raw = await AsyncStorage.getItem(this._key(logId));
+      return raw ? JSON.parse(raw) : null;
+    } catch { return null; }
+  },
+  async save(logId: number, content: string, title?: string): Promise<void> {
+    try {
+      await AsyncStorage.setItem(this._key(logId), JSON.stringify({ content, title, generated_at: new Date().toISOString() }));
+    } catch (e) { console.error('[ArticleCache] save error:', e); }
+  },
+};
+
 // Types
 interface PassageMainProps {
   sessionId?: string;
@@ -288,7 +306,6 @@ const PassageMainPage: React.FC<PassageMainProps> = ({
         return;
       }
 
-      // Parse sessionId as logId
       const logId = parseInt(sessionId);
       if (isNaN(logId)) {
         console.error('[PassageMain] Invalid sessionId (logId):', sessionId);
@@ -297,19 +314,39 @@ const PassageMainPage: React.FC<PassageMainProps> = ({
 
       dispatch(setSessionId(sessionId));
 
-      // Clear highlighter and sentence splitter when starting new article
       clearHighlighter();
       processedLengthRef.current = 0;
       clearSentenceSplitter();
 
       try {
-        // Always generate new article first
-        console.log('[PassageMain] Generating new article content for logId:', logId);
-        const result = await dispatch(generateArticleStreamFromLog(logId)).unwrap();
+        // Check local cache first
+        const cached = await ArticleCache.get(logId);
+        if (cached && cached.content) {
+          console.log('[PassageMain] Loading article from cache for logId:', logId, 'length:', cached.content.length);
 
+          // Feed cached content through streaming pipeline so highlighting/sentences work
+          dispatch(startStreaming());
+          dispatch(updateStreamingContent(cached.content));
+
+          // Let the useEffect process the content, then finalize
+          setTimeout(() => {
+            dispatch(setStreamingComplete({
+              id: `cached-${logId}`,
+              title: cached.title || '',
+              content: cached.content,
+              logId,
+              generatedAt: cached.generated_at,
+            }));
+          }, 150);
+          return;
+        }
+
+        // No cache — generate via WebSocket
+        console.log('[PassageMain] No cache found, generating article for logId:', logId);
+        const result = await dispatch(generateArticleStreamFromLog(logId)).unwrap();
         console.log('[PassageMain] Article streaming started successfully:', result);
       } catch (error) {
-        console.error('[PassageMain] Failed to start article streaming from log:', error);
+        console.error('[PassageMain] Failed to initialize article:', error);
       }
     };
 
@@ -323,6 +360,20 @@ const PassageMainPage: React.FC<PassageMainProps> = ({
       dispatch(setSelectedWords([]));
     };
   }, [sessionId, dispatch]);
+
+  // Save article to local cache when streaming finishes
+  const prevIsStreamingRef = useRef(false);
+  useEffect(() => {
+    if (prevIsStreamingRef.current && !isStreaming && currentContent?.content && logId) {
+      // Streaming just finished — save to cache (skip if loaded from cache)
+      if (!currentContent.id?.startsWith('cached-')) {
+        console.log('[PassageMain] Saving article to cache, logId:', logId, 'length:', currentContent.content.length);
+        ArticleCache.save(logId, currentContent.content, currentContent.title || '')
+          .catch(err => console.error('[PassageMain] Failed to save article to cache:', err));
+      }
+    }
+    prevIsStreamingRef.current = isStreaming;
+  }, [isStreaming, currentContent, logId]);
 
   // Check if current article is favorited when component mounts or savedArticles change
   useEffect(() => {
@@ -668,7 +719,9 @@ const PassageMainPage: React.FC<PassageMainProps> = ({
   }, [difficulty, currentSegmentIndex, dispatch]);
 
   const isWordQueried = (word: string) => {
-    return selectedWords.some(w => w.text.toLowerCase() === word.toLowerCase());
+    const cleaned = word.replace(/[^\w]/g, '').toLowerCase();
+    if (!cleaned) return false;
+    return selectedWords.some(w => w.text.toLowerCase() === cleaned);
   };
   const handleWordPress = useCallback(async (
     wordAnalysis: WordAnalysis,
@@ -690,50 +743,34 @@ const PassageMainPage: React.FC<PassageMainProps> = ({
       setPendingUniqueWordKey(uniqueWordKey);
 
       const ref = wordRefs.current[uniqueWordKey || wordAnalysis.text];
-      if (ref && ref.measureInWindow) {
-        // inside handleWordPress -> isAlreadyQueried branch
-        ref.measureInWindow((x: number, y: number, width: number, height: number) => {
-          const safe = (n: number, fb = 0) => Number.isFinite(n) ? n : fb;
-          x = safe(x); y = safe(y); width = safe(width); height = safe(height);
-
-          const GAP = 8, modalH = 100;
-          const win = Dimensions.get('window');
-          const direction: 'down' | 'up' = y < win.height / 2 ? 'down' : 'up';
-
-          let yPos = direction === 'down' ? y + height + GAP : y - modalH - GAP;
-          if (!Number.isFinite(yPos)) yPos = win.height / 2 - modalH / 2;
-
-          setWordChoiceModalPosition({
-            x: safe(x + width / 2, win.width / 2),
-            y: yPos,
-            direction,
-          });
-          setShowWordChoiceModal(true);
-        });
-
-        // ref.measureInWindow((x: number, y: number, width: number, height: number) => {
-        //   const GAP = 8;
-        //   const modalHeight = 100;
-        //   const windowHeight = Dimensions.get('window').height || 800;
-        //   const windowWidth = Dimensions.get('window').width || 400;
-        //
-        //   const direction: 'down' | 'up' = (y < windowHeight / 2) ? 'down' : 'up';
-        //
-        //   setWordChoiceModalPosition({
-        //     x: x + width / 2,
-        //     y: direction === 'down' ? y + height + GAP : y - modalHeight - GAP,
-        //     direction,
-        //   });
-        //   setShowWordChoiceModal(true);
-        // });
-      } else {
-        // Fallback position
-        setWordChoiceModalPosition({
-          x: pressPoint?.x ?? Dimensions.get('window').width / 2,
-          y: pressPoint?.y ?? Dimensions.get('window').height / 2,
-          direction: 'down',
-        });
+      const showChoiceAtPoint = (px: number, py: number) => {
+        const GAP = 8, modalH = 100;
+        const win = Dimensions.get('window');
+        const direction: 'down' | 'up' = py < win.height / 2 ? 'down' : 'up';
+        const yPos = direction === 'down' ? py + GAP : py - modalH - GAP;
+        setWordChoiceModalPosition({ x: px, y: yPos, direction });
         setShowWordChoiceModal(true);
+      };
+
+      if (ref && ref.measureInWindow) {
+        ref.measureInWindow((x: number, y: number, w: number, h: number) => {
+          const measuredValid =
+            isFinite(x) && isFinite(y) && isFinite(w) && isFinite(h) && w > 0 && h > 0;
+
+          if (measuredValid) {
+            showChoiceAtPoint(x + w / 2, y + h);
+          } else if (pressPoint && isFinite(pressPoint.x) && isFinite(pressPoint.y)) {
+            showChoiceAtPoint(pressPoint.x, pressPoint.y);
+          } else {
+            const win = Dimensions.get('window');
+            showChoiceAtPoint(win.width / 2, win.height / 2);
+          }
+        });
+      } else if (pressPoint && isFinite(pressPoint.x) && isFinite(pressPoint.y)) {
+        showChoiceAtPoint(pressPoint.x, pressPoint.y);
+      } else {
+        const win = Dimensions.get('window');
+        showChoiceAtPoint(win.width / 2, win.height / 2);
       }
       return;
     }
@@ -786,7 +823,7 @@ const PassageMainPage: React.FC<PassageMainProps> = ({
 
         // Calculate modal direction - default to above word
         const GAP = 8;
-        const modalHeight = 120; // Modal height
+        const modalHeight = 160;
         const modalWidth = Math.min(articleWidth || Dimensions.get('window').width, 300); // Modal width
           const windowHeight = Dimensions.get('window').height || 800;
           const windowWidth = Dimensions.get('window').width || 400;
@@ -870,8 +907,26 @@ const PassageMainPage: React.FC<PassageMainProps> = ({
     }
   }, [dispatch, logId, selectedWords, articleWidth, isEnglishTranslationMode]);
 
-  const handleWordDefinition = useCallback(async (word: string, uniqueWordKey?: string) => {
-    // Reset modal state immediately
+  const handleWordDefinition = useCallback(async (word: string, uniqueWordKey?: string, pressEvent?: any) => {
+    // Capture press coordinates IMMEDIATELY (before any async work or state changes)
+    const pressPoint = pressEvent?.nativeEvent
+      ? { x: pressEvent.nativeEvent.pageX as number, y: pressEvent.nativeEvent.pageY as number }
+      : null;
+
+    // Also capture measureInWindow IMMEDIATELY via a Promise
+    const ref = wordRefs.current[uniqueWordKey || word];
+    const measuredPos = await new Promise<{ x: number; y: number; w: number; h: number } | null>((resolve) => {
+      if (ref && ref.measureInWindow) {
+        ref.measureInWindow((x: number, y: number, w: number, h: number) => {
+          const valid = isFinite(x) && isFinite(y) && isFinite(w) && isFinite(h) && w > 0 && h > 0;
+          resolve(valid ? { x, y, w, h } : null);
+        });
+      } else {
+        resolve(null);
+      }
+    });
+
+    // Reset modal state
     setWordDefinition(null);
     setWordOptions([]);
     setWordDefinitionCorrect(null);
@@ -882,42 +937,25 @@ const PassageMainPage: React.FC<PassageMainProps> = ({
     setCurrentWordPhonetic('');
     checkmarkScale.setValue(0);
 
-    // Enhanced word matching using Porter Stemmer
-    // Search in both newWords and reviewedWords
     const findMatchingWord = (targetWord: string) => {
       const cleanTargetWord = targetWord.toLowerCase().replace(/[^\w]/g, '');
       const targetStem = stemmer(cleanTargetWord);
       
-      // Helper function to check if a word matches
       const checkWordMatch = (word: { word: string }) => {
         const cleanWord = word.word.toLowerCase().replace(/[^\w]/g, '');
-        if (cleanTargetWord === cleanWord) {
-          return true; // Exact match
-        }
+        if (cleanTargetWord === cleanWord) return true;
         const wordStem = stemmer(cleanWord);
-        if (targetStem === wordStem && targetStem.length > 2) {
-          return true; // Stem match
-        }
-        if (cleanTargetWord.startsWith(wordStem) || wordStem.startsWith(targetStem)) {
-          return true; // Prefix match
-        }
+        if (targetStem === wordStem && targetStem.length > 2) return true;
+        if (cleanTargetWord.startsWith(wordStem) || wordStem.startsWith(targetStem)) return true;
         return false;
       };
       
-      // First, search in newWords
       for (const newWord of newWords) {
-        if (checkWordMatch(newWord)) {
-          return newWord;
-        }
+        if (checkWordMatch(newWord)) return newWord;
       }
-      
-      // Then, search in reviewedWords
       for (const reviewedWord of reviewedWords) {
-        if (checkWordMatch(reviewedWord)) {
-          return reviewedWord;
-        }
+        if (checkWordMatch(reviewedWord)) return reviewedWord;
       }
-      
       return null;
     };
 
@@ -930,10 +968,8 @@ const PassageMainPage: React.FC<PassageMainProps> = ({
     }
 
     try {
-      console.log('[WordDefinition] Found matching word:', matchedWord);
       const wordDefinitionApi = WordDefinitionApi.getInstance();
       const wordDefinitionData = await wordDefinitionApi.getDefinitionAndDistractors(matchedWord.id.toString());
-      console.log('[WordDefinition] API response:', wordDefinitionData);
 
       if (!wordDefinitionData || !wordDefinitionData.definition || !Array.isArray(wordDefinitionData.distractors)) {
         console.error('[WordDefinition] Invalid API response structure:', wordDefinitionData);
@@ -941,7 +977,6 @@ const PassageMainPage: React.FC<PassageMainProps> = ({
         return;
       }
 
-      // Prepare quiz content
       setCurrentWordText(matchedWord.word);
       setCurrentWordPhonetic(matchedWord.phonetic || '');
       const correctAnswer = wordDefinitionData.definition;
@@ -952,75 +987,41 @@ const PassageMainPage: React.FC<PassageMainProps> = ({
       options.splice(randomIndex, 0, correctAnswer);
       setWordOptions(options);
 
-      // Get position and show modal
-      const ref = wordRefs.current[uniqueWordKey || word];
-      if (ref && ref.measureInWindow) {
-        ref.measureInWindow((x: number, y: number, width: number, height: number) => {
-          let safeX = x, safeY = y, safeWidth = width, safeHeight = height;
-          console.log('[WordDefinition] safeX:', safeX, 'safeY:', safeY, 'safeWidth:', safeWidth, 'safeHeight:', safeHeight);
-          if (!isFinite(x) || !isFinite(y) || !isFinite(width) || !isFinite(height)) {
-            console.warn('[WordDefinition] measureInWindow NaN, using fallback');
-            const { width: wWidth, height: wHeight } = Dimensions.get('window');
-            safeX = wWidth / 2;
-            safeY = wHeight / 2;
-            safeWidth = 0;
-            safeHeight = 0;
-          }
+      // Use pre-captured position to show the modal near the word
+      const showDefinitionAtPosition = (x: number, y: number, w: number, h: number) => {
+        const GAP = 8;
+        const modalHeight = 160;
+        const windowHeight = Dimensions.get('window').height;
+        const safeTopMargin = 60;
+        const safeBottomMargin = 60;
 
-          const GAP = 4;
-          const modalHeight = 30;
-          const windowHeight = Dimensions.get('window').height;
+        const direction: 'down' | 'up' = y < windowHeight / 2 ? 'down' : 'up';
+        let modalY = direction === 'down'
+          ? y + h + GAP
+          : y - modalHeight - GAP;
 
-          let modalY: number;
-          let direction: 'down' | 'up';
-            // Fix condition: only trigger for words truly near bottom or with invalid measurements
-          const isNearBottom = safeY + safeHeight > windowHeight - 50; // Only if word is within 50px of bottom
-          const hasInvalidMeasurements = safeY === 0 || safeHeight === 0;
+        if (modalY < safeTopMargin) modalY = safeTopMargin;
+        if (modalY + modalHeight > windowHeight - safeBottomMargin) {
+          modalY = windowHeight - modalHeight - safeBottomMargin;
+        }
 
-          if (hasInvalidMeasurements || isNearBottom) {
-            // Only show warning for words actually near bottom
-            if (isNearBottom && !hasInvalidMeasurements) {
-              console.warn('[WordDefinition] Word near bottom of screen:', word, 'safeY:', safeY, 'windowHeight:', windowHeight);
-            }
-            // Use fallback position for invalid measurements
-            if (hasInvalidMeasurements) {
-              modalY = windowHeight / 2 - modalHeight / 2;
-            } else {
-              modalY = safeY - modalHeight - GAP; // Position above word
-            }
-            direction = 'up';
-            console.log('[WordDefinition] direction:', direction, 'modalY:', modalY);
-          } else {
-            // Default to 'down' for all other cases, positioned directly below word
-            direction = 'down';
-            modalY = safeY + safeHeight + GAP; // Position directly below word with minimal gap
-
-            // Only adjust if absolutely necessary to stay on screen
-            const safeBottomMargin = 10; // Minimal bottom margin
-            console.log('[WordDefinition] direction:', direction, 'modalY:', modalY);
-          }
-
-          setWordModalPosition({
-            x: safeX + safeWidth / 2,
-            y: modalY,
-            width: safeWidth,
-            height: safeHeight,
-            direction,
-          });
-
-          setShowWordDefinitionModal(true);
-        });
-      } else {
-        console.log('[WordDefinition] Ref not available, using fallback');
-        const { width: wWidth, height: wHeight } = Dimensions.get('window');
         setWordModalPosition({
-          x: wWidth / 2,
-          y: wHeight / 2 - 100,
-          width: 0,
-          height: 0,
-          direction: 'down',
+          x: x + w / 2,
+          y: modalY,
+          width: w,
+          height: h,
+          direction,
         });
         setShowWordDefinitionModal(true);
+      };
+
+      if (measuredPos) {
+        showDefinitionAtPosition(measuredPos.x, measuredPos.y, measuredPos.w, measuredPos.h);
+      } else if (pressPoint && isFinite(pressPoint.x) && isFinite(pressPoint.y)) {
+        showDefinitionAtPosition(pressPoint.x, pressPoint.y, 0, 0);
+      } else {
+        const win = Dimensions.get('window');
+        showDefinitionAtPosition(win.width / 2, win.height / 2, 0, 0);
       }
     } catch (error) {
       console.log('[WordDefinition] API error:', error);
@@ -1041,7 +1042,7 @@ const PassageMainPage: React.FC<PassageMainProps> = ({
   }, [dispatch]);
 
   const handleBackPress = () => {
-    if (router.canGoBack && router.canGoBack()) {
+    if (router.canGoBack()) {
       router.back();
     } else {
       router.replace('/(tabs)/MainPage');
@@ -1284,7 +1285,7 @@ const PassageMainPage: React.FC<PassageMainProps> = ({
                 if (segment.isReviewed && showReviewedWords) {
                   handleWordPress(wa, key, e);
                 } else if (segment.isHighlighted) {
-                  handleWordDefinition(segment.text, key);
+                  handleWordDefinition(segment.text, key, e);
                 } else {
                   handleWordPress(wa, key, e);
                 }
@@ -1403,8 +1404,7 @@ const PassageMainPage: React.FC<PassageMainProps> = ({
               }
             } else {
               console.log('[PassageMain] segment.text', segment.text);
-              // Pass the unique key to handleWordDefinition
-              handleWordDefinition(segment.text, uniqueWordKey);
+              handleWordDefinition(segment.text, uniqueWordKey, e);
             }
           }}
           // Important: long-press must be on the leaf Text nodes as well.
@@ -1903,7 +1903,10 @@ const PassageMainPage: React.FC<PassageMainProps> = ({
               <View
                 style={{
                   position: 'absolute',
-                  left: wordModalPosition.x - articleX - 12,
+                  left: Math.max(16, Math.min(
+                    isFinite(wordModalPosition.x) ? wordModalPosition.x - articleX - 12 : 0,
+                    articleWidth - 40
+                  )),
                   top: -12,
                   width: 0,
                   height: 0,
@@ -1913,6 +1916,7 @@ const PassageMainPage: React.FC<PassageMainProps> = ({
                   borderLeftColor: 'transparent',
                   borderRightColor: 'transparent',
                   borderBottomColor: '#FFF3E6',
+                  zIndex: 101,
                 }}
               />
             )}
@@ -1921,12 +1925,12 @@ const PassageMainPage: React.FC<PassageMainProps> = ({
               style={{
                 backgroundColor: '#FFF3E6',
                 borderRadius: 16,
-                padding: 18,
-                paddingHorizontal: 26,
+                padding: 14,
+                paddingHorizontal: 16,
                 width: articleWidth,
-                height: 70, // 固定高度，与modalHeight保持一致
+                minHeight: 70,
                 alignItems: 'center',
-                justifyContent: 'center', // 确保内容垂直居中
+                justifyContent: 'center',
                 shadowColor: '#000',
                 shadowOffset: { width: 0, height: 4 },
                 shadowOpacity: 0.18,
@@ -1934,33 +1938,22 @@ const PassageMainPage: React.FC<PassageMainProps> = ({
                 elevation: 8,
               }}
             >
-              {/* 干扰项内容 */}
               {!showCheckmark && !showWordDetails ? (
-                <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', width: '100%',}}>
+                <View style={{ flexDirection: 'row', flexWrap: 'wrap', width: '100%' }}>
                   {Array.isArray(wordOptions) && wordOptions.length > 0 && wordOptions.map((option, idx) => (
-                    <React.Fragment key={`${option}-${idx}`}>
-                      {/* if wordDefinitionCorrect  == wordDefinition, set color to green */}
-                      {/* if wordDefinitionCorrect  !== wordDefinition, set color to red */}
-                      {/* if wordDefinitionCorrect  == wordDefinition, set color to black */}
-                      <Pressable
-                        onPress={() => {
-                        console.log('[PassageMain] wordDefinitionCorrect', wordDefinitionCorrect);
-                        console.log('[PassageMain] wordDefinition', wordDefinition);
-                        console.log('[PassageMain] option', option);
-                        console.log('[PassageMain] wordDefinitionCorrect === wordDefinition', wordDefinitionCorrect === wordDefinition);
-                        console.log('[PassageMain] wordDefinitionCorrect !== wordDefinition', wordDefinitionCorrect !== wordDefinition);
+                    <Pressable
+                      key={`${option}-${idx}`}
+                      style={{
+                        width: '50%',
+                        paddingVertical: 8,
+                        paddingHorizontal: 6,
+                      }}
+                      onPress={() => {
                         setWordDefinitionCorrect(option);
-
-                        // Check if this is the correct answer
                         if (option === wordDefinition) {
-                          // Trigger animation for correct answer
                           setShowCorrectAnswer(true);
-
-                          // Show checkmark after 0.5 seconds (after text turns green)
                           setTimeout(() => {
                             setShowCheckmark(true);
-
-                            // Animate checkmark scale from 0 to 1
                             Animated.spring(checkmarkScale, {
                               toValue: 1,
                               useNativeDriver: true,
@@ -1968,8 +1961,6 @@ const PassageMainPage: React.FC<PassageMainProps> = ({
                               friction: 8,
                             }).start();
                           }, 500);
-
-                          // After checkmark animation, show word details
                           setTimeout(() => {
                             setShowCheckmark(false);
                             setShowWordDetails(true);
@@ -1981,32 +1972,25 @@ const PassageMainPage: React.FC<PassageMainProps> = ({
                       <Text
                         style={[
                           {
-                          color: '#333',
-                          fontSize: 12,
-                          fontWeight: '500',
-                          textAlignVertical: 'center',
-                          minWidth: 80,
-                        },
-                        wordDefinitionCorrect !== null && option === wordDefinitionCorrect && (
-                          option === wordDefinition
-                            ? { color: '#4CAF50' } // 选中且正确
-                            : { color: '#F44336' } // 选中但错误
-                        ),
-                        wordDefinitionCorrect === null && {
-                          color: '#333',
-                        },
-                      ]}
-                    >
-                      {option}
-                    </Text>
+                            color: '#333',
+                            fontSize: 13,
+                            fontWeight: '500',
+                            lineHeight: 18,
+                          },
+                          wordDefinitionCorrect !== null && option === wordDefinitionCorrect && (
+                            option === wordDefinition
+                              ? { color: '#4CAF50' }
+                              : { color: '#F44336' }
+                          ),
+                        ]}
+                        numberOfLines={3}
+                      >
+                        {option}
+                      </Text>
                     </Pressable>
-                    {idx !== wordOptions.length - 1 && (
-                      <Text style={{ color: '#FC9B33', fontSize: 18, marginHorizontal: 4 }}>|</Text>
-                    )}
-                  </React.Fragment>
-                                    ))}
-                  </View>
-                ) : showCheckmark ? (
+                  ))}
+                </View>
+              ) : showCheckmark ? (
                   <View style={styles.checkmarkContainer}>
                     <Animated.View style={{ transform: [{ scale: checkmarkScale }] }}>
                       <Ionicons
@@ -2040,7 +2024,10 @@ const PassageMainPage: React.FC<PassageMainProps> = ({
               <View
                 style={{
                   position: 'absolute',
-                  left: (isFinite(wordModalPosition.x) && isFinite(articleX)) ? wordModalPosition.x - articleX - 12 : 0,
+                  left: Math.max(16, Math.min(
+                    (isFinite(wordModalPosition.x) && isFinite(articleX)) ? wordModalPosition.x - articleX - 12 : 0,
+                    articleWidth - 40
+                  )),
                   bottom: -12,
                   width: 0,
                   height: 0,
@@ -2050,6 +2037,7 @@ const PassageMainPage: React.FC<PassageMainProps> = ({
                   borderLeftColor: 'transparent',
                   borderRightColor: 'transparent',
                   borderTopColor: '#FFF3E6',
+                  zIndex: 101,
                 }}
               />
             )}
@@ -2503,8 +2491,9 @@ const styles = StyleSheet.create({
     borderBottomColor: '#FC9B33',
   },
   queriedWordUnderline: {
-    borderBottomWidth: 2,
-    borderBottomColor: '#FC9B33',
+    textDecorationLine: 'underline',
+    textDecorationColor: '#FC9B33',
+    textDecorationStyle: 'solid',
   },
   wordContainer: {
     paddingHorizontal: 2,

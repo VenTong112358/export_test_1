@@ -6,14 +6,14 @@ import { useTheme } from '@hooks/useTheme';
 import { useRouter } from 'expo-router';
 import React, { useRef, useState } from 'react';
 import {
-  Dimensions,
-  Modal,
-  Platform,
-  ScrollView,
-  StyleSheet,
-  Text,
-  TouchableOpacity,
-  View,
+    Dimensions,
+    Modal,
+    Platform,
+    ScrollView,
+    StyleSheet,
+    Text,
+    TouchableOpacity,
+    View,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Header } from './Header';
@@ -160,27 +160,13 @@ export const WordPreview: React.FC<WordPreviewProps> = ({ logId, words, onBackPr
     setChineseExceptions(new Set());
   };
 
-  // Handle sound button press
   const handleSoundPress = async (word: string) => {
     if (!word) return;
-    
+
     try {
-      // Get access token for authentication
-      const httpClient = require('../../data/api/HttpClient').HttpClient.getInstance();
-      const token = httpClient.getAccessToken();
-      
-      // Check if user is authenticated
-      if (!token) {
-        console.warn('[WordPreview] 用户未登录，无法播放语音');
-        // You could show a toast or alert here
-        return;
-      }
-      
-      // const url = await SpeakApi.getInstance().getSpeechUrl({ word });
       const url = await SpeakApi.getInstance().getSpeechUrl({ word });
       console.log('[WordPreview] 尝试播放语音，URL:', url);
 
-             // // Use expo-av for native platforms (import dynamically to avoid load-time crashes)
       if (!Audio) {
         try {
           const mod = require('expo-av');
@@ -191,7 +177,6 @@ export const WordPreview: React.FC<WordPreviewProps> = ({ logId, words, onBackPr
         }
       }
 
-      // Unload previous sound
       if (soundRef.current) {
         await soundRef.current.unloadAsync();
         soundRef.current = null;
@@ -205,134 +190,10 @@ export const WordPreview: React.FC<WordPreviewProps> = ({ logId, words, onBackPr
           sound.unloadAsync();
         }
       });
-
     } catch (error: any) {
       console.error('[WordPreview] 语音播放失败:', error.message || error);
-      // You could show a user-friendly error message here
     }
   };
-       // Use expo-av for native platforms (import dynamically to avoid load-time crashes)
-        // if (!Audio) {
-        //   try {
-        //     const mod = require('expo-av');
-        //     Audio = mod.Audio;
-        //   } catch (e) {
-        //     console.error('[WordPreview] Failed to load expo-av:', e);
-        //     return;
-        //   }
-        // }
-        //
-        // // Unload previous sound
-        // if (soundRef.current) {
-        //   await soundRef.current.unloadAsync();
-        //   soundRef.current = null;
-        // }
-        //
-        // const { sound } = await Audio.Sound.createAsync({ uri: url2 });
-        // soundRef.current = sound;
-        // await sound.playAsync();
-        // sound.setOnPlaybackStatusUpdate((status: any) => {
-        //   if (status.isLoaded && status.didJustFinish) {
-        //     sound.unloadAsync();
-        //   }
-        // });
-      // if (Platform.OS === 'web') {
-        // // Use HTML5 Audio for web platform with enhanced error handling
-        // try {
-        //   // Add timeout and better error handling
-        //   const controller = new AbortController();
-        //   const timeoutId = setTimeout(() => controller.abort(), 15000); // 15 second timeout
-        //
-        //   const response = await fetch(url, {
-        //     method: 'GET',
-        //     headers: {
-        //       'Accept': 'audio/*',
-        //       'Cache-Control': 'no-cache',
-        //       'Authorization': `Bearer ${token}`
-        //     },
-        //     signal: controller.signal
-        //   });
-        //
-        //   clearTimeout(timeoutId);
-        //
-        //   if (!response.ok) {
-        //     if (response.status === 401) {
-        //       console.error('[WordPreview] 认证失败，请重新登录');
-        //       return;
-        //     }
-        //     if (response.status === 404) {
-        //       console.warn('[WordPreview] 语音文件不存在:', word);
-        //       return;
-        //     }
-        //     if (response.status === 403) {
-        //       console.error('[WordPreview] 权限不足，无法访问语音服务');
-        //       return;
-        //     }
-        //     throw new Error(`HTTP ${response.status}: ${response.statusText}`);
-        //   }
-        //
-        //   const contentType = response.headers.get('content-type');
-        //   if (!contentType || !contentType.includes('audio')) {
-        //     console.warn('[WordPreview] 返回的不是音频文件，内容类型:', contentType);
-        //     return;
-        //   }
-        //
-        //   const audioBlob = await response.blob();
-        //   const audioUrl = URL.createObjectURL(audioBlob);
-        //   const audio = new (window as any).Audio(audioUrl);
-        //
-        //   audio.onended = () => {
-        //     URL.revokeObjectURL(audioUrl);
-        //   };
-        //
-        //   audio.onerror = (e: any) => {
-        //     console.error('[WordPreview] 音频播放错误:', e);
-        //     URL.revokeObjectURL(audioUrl);
-        //   };
-        //
-        //   await audio.play();
-        //   console.log('[WordPreview] 语音播放成功:', word);
-        // } catch (error: any) {
-        //   if (error.name === 'AbortError') {
-        //     console.warn('[WordPreview] 语音请求超时:', word);
-        //   } else if (error.message.includes('net::ERR_FAILED')) {
-        //     console.error('[WordPreview] 网络连接失败，请检查网络连接');
-        //   } else {
-        //     console.error('[WordPreview] Web音频播放失败:', error.message);
-        //   }
-        // }
-      // } else {
-        // // Use expo-av for native platforms (import dynamically to avoid load-time crashes)
-        // if (!Audio) {
-        //   try {
-        //     const mod = require('expo-av');
-        //     Audio = mod.Audio;
-        //   } catch (e) {
-        //     console.error('[WordPreview] Failed to load expo-av:', e);
-        //     return;
-        //   }
-        // }
-        //
-        // // Unload previous sound
-        // if (soundRef.current) {
-        //   await soundRef.current.unloadAsync();
-        //   soundRef.current = null;
-        // }
-        //
-        // const { sound } = await Audio.Sound.createAsync({ uri: url2 });
-        // soundRef.current = sound;
-        // await sound.playAsync();
-        // sound.setOnPlaybackStatusUpdate((status: any) => {
-        //   if (status.isLoaded && status.didJustFinish) {
-        //     sound.unloadAsync();
-        //   }
-        // });
-      // }
-  //   } catch (error: any) {
-  //     console.error('[WordPreview] 语音播放失败:', error.message || error);
-  //     // You could show a user-friendly error message here
-  //   }
-  // };
 
   // Handle start learning button
   const handleStartLearning = () => {

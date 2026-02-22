@@ -76,6 +76,13 @@ export const Header: React.FC<HeaderProps> = ({
         backgroundColor: backgroundColor || theme.colors.background,
       }
     ]}>
+      {/* Title (absolute, behind buttons) */}
+      <View pointerEvents="none" style={styles.titleContainer}>
+        <Text style={[styles.headerTitle, { color: titleColor }]}>
+          {title}
+        </Text>
+      </View>
+
       {/* Left Button */}
       <View style={styles.leftButton}>
         {showBackButton ? (
@@ -90,11 +97,6 @@ export const Header: React.FC<HeaderProps> = ({
           <View style={styles.placeholder} />
         )}
       </View>
-
-      {/* Title */}
-      <Text pointerEvents="none" style={[styles.headerTitle, { color: titleColor }]}>
-        {title}
-      </Text>
 
       {/* Right Button */}
       <View style={styles.rightButton}>
@@ -132,19 +134,27 @@ const styles = StyleSheet.create({
     zIndex: 9990, // 确保Header在Modal之上
     height: 70,
   },
+  titleContainer: {
+    position: 'absolute',
+    left: 0,
+    right: 0,
+    top: 0,
+    bottom: 0,
+    justifyContent: 'center',
+    alignItems: 'center',
+    zIndex: 0,
+  },
   headerTitle: {
     fontSize: 20,
     fontFamily: Platform.select({ ios: 'DM Sans', android: 'sans-serif' }),
     fontWeight: '700',
-    position: 'absolute',
-    left: 0,
-    right: 0,
-    paddingHorizontal: 80, // avoid overlapping left/right buttons
     textAlign: 'center',
+    paddingHorizontal: 80,
   },
   leftButton: {
     width: 40,
     alignItems: 'flex-start',
+    zIndex: 1,
   },
   rightButton: {
     minWidth: 40,
@@ -152,6 +162,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'flex-end',
     flexShrink: 0,
+    zIndex: 1,
   },
   button: {
     padding: 8,
