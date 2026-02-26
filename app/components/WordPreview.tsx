@@ -303,10 +303,10 @@ export const WordPreview: React.FC<WordPreviewProps> = ({ logId, words, onBackPr
         <View style={styles.wordsSection}>
           <View style={recipes.sectionHeader.wordPreviewRow}>
             <View style={recipes.badge.badgeGreen}>
-              <Text style={recipes.badge.badgeGreenText}>New Academic Terms</Text>
+              <Text style={recipes.badge.badgeGreenText}>新学术词汇</Text>
             </View>
             <Text style={recipes.sectionHeader.wordPreviewCount}>
-              {words.length} ITEMS
+              {words.length} 个词
             </Text>
           </View>
 
@@ -319,7 +319,7 @@ export const WordPreview: React.FC<WordPreviewProps> = ({ logId, words, onBackPr
                 }}
               >
                 <Text style={recipes.button.primaryCtaText}>
-                  🧪 Show Reviewed Words ({currentReviewedWords.length})
+                  🧪 显示已复习词汇 ({currentReviewedWords.length})
                 </Text>
               </TouchableOpacity>
             </View>

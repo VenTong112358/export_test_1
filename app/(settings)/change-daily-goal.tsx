@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, Dimensions, Platform, ScrollView } from 'react-native';
+import { View, Text, TouchableOpacity, ScrollView, ActivityIndicator } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useTheme } from '@hooks/useTheme';
@@ -7,19 +7,17 @@ import { useRouter } from 'expo-router';
 import { useSelector } from 'react-redux';
 import { RootState } from '@data/repository/store';
 import { useDailyLearningLogs } from '@hooks/useDailyLearningLogs';
-import axios from 'axios';
-import { Header } from '../components/Header';
 import { HttpClient } from '@data/api/HttpClient';
-import { API_CONFIG, API_ENDPOINTS } from '@data/api/ApiConfig';
+import { API_ENDPOINTS } from '@data/api/ApiConfig';
+import { recipes } from '@constants/recipes';
 
-const { width, height } = Dimensions.get('window');
-
-// 每日目标选项
 const dailyGoalOptions = [
-  { id: 1, words: 10, articles: 1, description: '10个单词 1篇文章' },
-  { id: 2, words: 20, articles: 2, description: '20个单词 2篇文章' },
-  { id: 3, words: 30, articles: 3, description: '30个单词 3篇文章' },
+  { id: 1, words: 10, articles: 1, title: '每日1篇文章', subtitle: '轻松学习' },
+  { id: 2, words: 20, articles: 2, title: '每日2篇文章', subtitle: '常规练习' },
+  { id: 3, words: 30, articles: 3, title: '每日3篇文章', subtitle: '强化学习' },
 ];
+
+const dg = recipes.dailyGoalSelection;
 
 export default function ChangeDailyGoalPage() {
   const { theme } = useTheme();
@@ -40,7 +38,7 @@ export default function ChangeDailyGoalPage() {
       id: goalId,
       words: goal?.words,
       articles: goal?.articles,
-      description: goal?.description
+      title: goal?.title
     });
   };
 
@@ -97,186 +95,61 @@ export default function ChangeDailyGoalPage() {
 
   const renderGoalOption = (option: typeof dailyGoalOptions[0]) => {
     const isSelected = selectedGoal === option.id;
-    
     return (
       <TouchableOpacity
         key={option.id}
-        style={[
-          styles.goalOption,
-          isSelected && styles.selectedGoalOption
-        ]}
+        style={[dg.goalCard, isSelected && dg.goalCardSelected]}
         onPress={() => handleGoalSelect(option.id)}
       >
-        <View style={styles.goalIcon}>
-          <Ionicons 
-            name="flag" 
-            size={24} 
-            color={isSelected ? '#FC9833' : '#666'} 
-          />
-        </View>
-        <Text style={[
-          styles.goalText,
-          isSelected && styles.selectedGoalText
-        ]}>
-          {option.description}
+        <Text style={[dg.goalCardTitle, isSelected && dg.goalCardTitleSelected]}>
+          {option.title}
+        </Text>
+        <Text style={[dg.goalCardSubtitle, isSelected && dg.goalCardSubtitleSelected]}>
+          {option.subtitle}
         </Text>
       </TouchableOpacity>
     );
   };
 
   return (
-    <SafeAreaView style={[styles.container, { backgroundColor: theme.colors.background }]}>
-      {/* Header */}
-      <Header 
-        title="更改每日目标"
-        showBackButton={true}
-        showMenuButton={false}
-        showNotificationButton={false}
-        onBackPress={handleBackPress}
-      />
+    <SafeAreaView style={[dg.screen, { backgroundColor: theme.colors.background }]} edges={['top']}>
+      <TouchableOpacity onPress={handleBackPress} style={{ position: 'absolute', left: 16, top: 32, zIndex: 10 }}>
+        <Ionicons name="arrow-back" size={24} color={theme.colors.primary} />
+      </TouchableOpacity>
 
-      {/* Content */}
-      <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
-        <View style={styles.titleSection}>
-          <Text style={styles.instruction}>请您更改每日目标</Text>
-          <Text style={styles.instructionEn}>Please change your daily goal</Text>
+      <ScrollView contentContainerStyle={{ flexGrow: 1 }} showsVerticalScrollIndicator={false}>
+        <View style={dg.header}>
+          <Text style={dg.headerTitle}>设定您的每日学业目标</Text>
+          <Text style={dg.headerSubtitle}>选择每日文章目标，开启学业之旅</Text>
+          <View style={dg.headerDivider} />
         </View>
 
-        {/* Goal Options */}
-        <View style={styles.goalsContainer}>
-          {dailyGoalOptions.map(renderGoalOption)}
+        <View style={dg.main}>
+          <View style={dg.goalCardList}>
+            {dailyGoalOptions.map(renderGoalOption)}
+          </View>
         </View>
 
-        {/* Complete Button */}
-        <TouchableOpacity
-          style={[
-            styles.completeButton,
-            (!selectedGoal || isSubmitting) && styles.completeButtonDisabled
-          ]}
-          onPress={handleCompletePress}
-          disabled={!selectedGoal || isSubmitting}
-        >
-          <Text style={[
-            styles.completeButtonText,
-            (!selectedGoal || isSubmitting) && styles.completeButtonTextDisabled
-          ]}>
-            {isSubmitting ? '提交中...' : '完成'}
-          </Text>
-        </TouchableOpacity>
+        <View style={dg.footer}>
+          <TouchableOpacity
+            style={[dg.confirmButton, (!selectedGoal || isSubmitting) && { backgroundColor: theme.colors.border, opacity: 0.8 }]}
+            onPress={handleCompletePress}
+            disabled={!selectedGoal || isSubmitting}
+          >
+            <Text style={dg.confirmButtonText}>
+              {isSubmitting ? '提交中...' : '确认并开始'}
+            </Text>
+          </TouchableOpacity>
+          <Text style={dg.footerQuote}>Veni, vidi, vici.</Text>
+        </View>
       </ScrollView>
+
+      {isSubmitting && (
+        <View style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(255,255,255,0.7)', justifyContent: 'center', alignItems: 'center', zIndex: 100 }}>
+          <ActivityIndicator size="large" color={theme.colors.primary} />
+          <Text style={{ marginTop: 16, fontSize: 16, color: theme.colors.primary, fontWeight: '600' }}>请稍候...</Text>
+        </View>
+      )}
     </SafeAreaView>
   );
 }
-
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-  },
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: width * 0.04,
-    paddingVertical: height * 0.015,
-    backgroundColor: '#FFFBF8',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.05,
-    shadowRadius: 3,
-    elevation: 2,
-  },
-  headerTitle: {
-    color: '#FC9833',
-    fontSize: 18,
-    fontFamily: Platform.select({ ios: 'DM Sans', android: 'sans-serif' }),
-    fontWeight: '700',
-  },
-  menuButton: {
-    padding: 8,
-  },
-  placeholder: {
-    width: 40, // 保持header布局平衡
-  },
-  content: {
-    flex: 1,
-    paddingHorizontal: width * 0.04,
-  },
-  titleSection: {
-    paddingVertical: height * 0.03,
-  },
-  instruction: {
-    fontSize: 20,
-    fontFamily: Platform.select({ ios: 'DM Sans', android: 'sans-serif' }),
-    color: '#0C1A30',
-    fontWeight: '600',
-    marginBottom: height * 0.005,
-  },
-  instructionEn: {
-    fontSize: 14,
-    fontFamily: Platform.select({ ios: 'Inter', android: 'sans-serif' }),
-    color: '#838589',
-    marginBottom: height * 0.01,
-  },
-  goalsContainer: {
-    marginBottom: height * 0.03,
-  },
-  goalOption: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: 'white',
-    borderRadius: 12,
-    padding: 20,
-    marginBottom: 16,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 3,
-    borderWidth: 2,
-    borderColor: 'transparent',
-  },
-  selectedGoalOption: {
-    borderColor: '#FC9833',
-    backgroundColor: '#FFF8F0',
-  },
-  goalIcon: {
-    marginRight: 16,
-  },
-  goalText: {
-    fontSize: 16,
-    fontFamily: Platform.select({ ios: 'DM Sans', android: 'sans-serif' }),
-    fontWeight: '600',
-    color: '#0C1A30',
-    flex: 1,
-  },
-  selectedGoalText: {
-    color: '#FC9833',
-  },
-  completeButton: {
-    backgroundColor: '#FC9833',
-    borderRadius: 12,
-    paddingVertical: height * 0.02,
-    paddingHorizontal: width * 0.04,
-    alignItems: 'center',
-    marginBottom: height * 0.03,
-    shadowColor: '#FC9833',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.3,
-    shadowRadius: 8,
-    elevation: 5,
-  },
-  completeButtonDisabled: {
-    backgroundColor: '#E0E0E0',
-    shadowOpacity: 0,
-    elevation: 0,
-  },
-  completeButtonText: {
-    color: 'white',
-    fontSize: 18,
-    fontFamily: Platform.select({ ios: 'DM Sans', android: 'sans-serif' }),
-    fontWeight: '700',
-  },
-  completeButtonTextDisabled: {
-    color: '#999',
-  },
-});

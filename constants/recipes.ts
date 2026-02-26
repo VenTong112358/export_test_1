@@ -1147,6 +1147,155 @@ export const passageReadingRecipes = {
 };
 
 // ---------------------------------------------------------------------------
+// Daily Goal Selection (change-daily-goal / onboarding daily goal)
+// ---------------------------------------------------------------------------
+
+export const dailyGoalSelectionRecipes = {
+  /** Screen: cream bg, padding */
+  screen: {
+    flex: 1,
+    backgroundColor: c.bgCream,
+    paddingHorizontal: s.pageHorizontalWide,
+    paddingTop: 32,
+    paddingBottom: 24,
+  } as ViewStyle,
+
+  /** Header: centered, mt-8 */
+  header: {
+    alignItems: 'center' as const,
+    marginTop: 24,
+  } as ViewStyle,
+
+  /** Title: 设定您的每日学业目标 — 2xl serif bold primary, uppercase tracking */
+  headerTitle: {
+    fontSize: 24,
+    fontFamily: t.fontFamily.serif,
+    fontWeight: t.fontWeight.bold,
+    color: c.primary,
+    lineHeight: 32,
+    letterSpacing: 2,
+    textAlign: 'center',
+  } as TextStyle,
+
+  /** Subtitle: Select a daily word target… — 13px muted */
+  headerSubtitle: {
+    fontSize: 13,
+    fontWeight: t.fontWeight.medium,
+    color: c.textMuted,
+    lineHeight: 20,
+    marginTop: 16,
+    textAlign: 'center',
+    maxWidth: 240,
+  } as TextStyle,
+
+  /** Divider: accent line, opacity 30 */
+  headerDivider: {
+    width: 48,
+    height: 1,
+    backgroundColor: c.accent,
+    opacity: 0.3,
+    marginTop: 40,
+  } as ViewStyle,
+
+  /** Main: centered, max-width feel, gap between cards */
+  main: {
+    flex: 1,
+    justifyContent: 'center' as const,
+    maxWidth: 400,
+    alignSelf: 'center' as const,
+    width: '100%',
+    marginVertical: 48,
+  } as ViewStyle,
+
+  /** Goal card list — gap 16 */
+  goalCardList: {
+    gap: 16,
+  } as ViewStyle,
+
+  /** Single goal card: border primary, bg white, rounded-sm, py-6 */
+  goalCard: {
+    borderWidth: 1,
+    borderColor: c.primary,
+    backgroundColor: c.cardBg,
+    paddingVertical: 24,
+    borderRadius: 4,
+    flexDirection: 'column' as const,
+    alignItems: 'center' as const,
+    justifyContent: 'center' as const,
+  } as ViewStyle,
+
+  /** Goal card — selected state: bg primary, border primary */
+  goalCardSelected: {
+    backgroundColor: c.primary,
+    borderColor: c.primary,
+  } as ViewStyle,
+
+  /** Goal card title: 每日N篇文章 — lg bold serif */
+  goalCardTitle: {
+    fontSize: 18,
+    fontFamily: t.fontFamily.serif,
+    fontWeight: t.fontWeight.bold,
+    color: c.primary,
+  } as TextStyle,
+
+  /** Goal card title — selected: white */
+  goalCardTitleSelected: {
+    color: c.cardBg,
+  } as TextStyle,
+
+  /** Goal card subtitle: Light Study / Regular Practice — 9px uppercase */
+  goalCardSubtitle: {
+    fontSize: 9,
+    fontWeight: t.fontWeight.bold,
+    letterSpacing: 3,
+    marginTop: 4,
+    color: c.primary,
+    opacity: 0.6,
+  } as TextStyle,
+
+  /** Goal card subtitle — selected: white, opacity 80 */
+  goalCardSubtitleSelected: {
+    color: c.cardBg,
+    opacity: 0.8,
+  } as TextStyle,
+
+  /** Footer: pb-6 (use flex:1 on main above to push footer down) */
+  footer: {
+    paddingBottom: 24,
+  } as ViewStyle,
+
+  /** Confirm button: full width primary, py-5, rounded-sm, serif bold 13px uppercase */
+  confirmButton: {
+    width: '100%',
+    backgroundColor: c.primary,
+    paddingVertical: 20,
+    borderRadius: 4,
+    alignItems: 'center' as const,
+    justifyContent: 'center' as const,
+    ...sh.button,
+  } as ViewStyle,
+
+  confirmButtonText: {
+    fontFamily: t.fontFamily.serif,
+    fontWeight: t.fontWeight.bold,
+    fontSize: 13,
+    color: c.cardBg,
+    letterSpacing: 4,
+  } as TextStyle,
+
+  /** Footer quote — 10px muted italic */
+  footerQuote: {
+    fontSize: 10,
+    fontWeight: t.fontWeight.medium,
+    color: c.textMuted,
+    letterSpacing: 1,
+    fontStyle: 'italic',
+    textAlign: 'center',
+    marginTop: 24,
+  } as TextStyle,
+};
+
+// ---------------------------------------------------------------------------
 // Progress bar styles
 // ---------------------------------------------------------------------------
 
@@ -1183,6 +1332,7 @@ export const recipes = {
   articleEvaluation: articleEvaluationRecipes,
   scholarProfile: scholarProfileRecipes,
   passageReading: passageReadingRecipes,
+  dailyGoalSelection: dailyGoalSelectionRecipes,
 } as const;
 
 export default recipes;
