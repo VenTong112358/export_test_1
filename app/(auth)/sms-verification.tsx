@@ -1,18 +1,37 @@
-import React, { useState, useEffect } from 'react';
-import { View, StyleSheet, ScrollView, Alert, Dimensions, Platform } from 'react-native';
-import { TextInput, Button, Text } from 'react-native-paper';
-import { useRouter, useLocalSearchParams } from 'expo-router';
-import { SmsApi } from '@data/api/SmsApi';
-import { useTheme } from '@hooks/useTheme';
-import { useAuth } from '@hooks/useAuth';
-import { useDispatch, useSelector } from 'react-redux';
-import { setUser, setToken } from '@data/usecase/UserUseCase';
+import { API_CONFIG, API_ENDPOINTS } from '@data/api/ApiConfig';
 import { HttpClient } from '@data/api/HttpClient';
-import { store, RootState } from '@data/repository/store';
-import { API_ENDPOINTS, API_CONFIG } from '@data/api/ApiConfig';
-import AsyncStorage from '@react-native-async-storage/async-storage';
+import { SmsApi } from '@data/api/SmsApi';
+import { RootState } from '@data/repository/store';
+import { setUser } from '@data/usecase/UserUseCase';
+import { useAuth } from '@hooks/useAuth';
+import { useTheme } from '@hooks/useTheme';
+import { useLocalSearchParams, useRouter } from 'expo-router';
+import { useEffect, useRef, useState } from 'react';
+import {
+  Alert,
+  KeyboardAvoidingView,
+  Platform,
+  TextInput as RNTextInput,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View,
+} from 'react-native';
+import { useDispatch, useSelector } from 'react-redux';
+import { designTokensColors as c, typography as t } from '../../constants/designTokens';
+import { recipes } from '../../constants/recipes';
 
-const { width, height } = Dimensions.get('window');
+const PX_8 = 32;
+const PY_10 = 40;
+const MT_8 = 32;
+const MY_8 = 32;
+const PB_8 = 32;
+const MAX_W_SM = 384;
+const SPACE_Y_4 = 16;
+const PT_4 = 16;
+const MT_4 = 16;
+const PT_8 = 32;
 
 export default function SmsVerificationScreen() {
   const [verificationCode, setVerificationCode] = useState('');
@@ -23,6 +42,7 @@ export default function SmsVerificationScreen() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [hasSubmitted, setHasSubmitted] = useState(false);
   const [showTemporaryAccess, setShowTemporaryAccess] = useState(false);
+  const otpInputRef = useRef<RNTextInput>(null);
 
   const router = useRouter();
   const params = useLocalSearchParams();
@@ -80,7 +100,7 @@ export default function SmsVerificationScreen() {
       } else if (purpose === 'change_password') {
         await resendChangePasswordCode();
       } else {
-        setError('Unknown verification purpose');
+        setError('未知的验证用途');
         return;
       }
       setCountdown(60);
@@ -213,65 +233,84 @@ export default function SmsVerificationScreen() {
     }
   };
 
-  return (
-    <ScrollView contentContainerStyle={[styles.container, { backgroundColor: theme.colors.background }]}> 
-      <View style={styles.content}>
-        {/* Title Section */}
-        <View style={styles.titleSection}>
-          <Text style={styles.title}>短信验证</Text>
-          <Text style={styles.subtitle}>验证码已发送至 {phoneNumber}</Text>
-        </View>
-        <View style={styles.inputSection}>
-          <View style={styles.inputLabel}>
-            <Text style={styles.labelText}>验证码</Text>
-            <Text style={styles.labelText}>Verification Code</Text>
-          </View>
-          <TextInput
-            value={verificationCode}
-            onChangeText={setVerificationCode}
-            mode="outlined"
-            style={styles.input}
-            contentStyle={[styles.inputContent, { fontSize: 14 }]}
-            outlineStyle={styles.inputOutline}
-            keyboardType="numeric"
-            maxLength={6}
-            placeholder="请输入6位验证码"
-            placeholderTextColor="#B0B0B0"
-          />
-        </View>
-        {error ? (
-          <Text style={styles.error}>{error}</Text>
-        ) : null}
-        <Button
-          mode="contained"
-          onPress={handleVerifyCode}
-          loading={loading}
-          disabled={loading || isSubmitting || hasSubmitted}
-          style={styles.verifyButton}
-          contentStyle={styles.verifyButtonContent}
-          labelStyle={styles.verifyButtonLabel}
-        >
-          {hasSubmitted ? '验证成功' : (loading ? '验证中...' : '验证')}
-        </Button>
-        <Button
-          mode="text"
-          onPress={handleResendCode}
-          disabled={!canResend || loading}
-          style={styles.button}
-          labelStyle={{ color: canResend ? theme.colors.primary : theme.colors.border }}
-        >
-          {canResend ? '重新发送验证码' : `重新发送 (${countdown}s)`}
-        </Button>
+  const handleOtpChange = (text: string) => {
+    setVerificationCode(text.replace(/\D/g, '').slice(0, 6));
+  };
 
-        <Button
-          mode="text"
-          onPress={() => router.back()}
-          style={styles.button}
-          labelStyle={{ color: theme.colors.border }}
-        >
-          返回
-        </Button>
-      </View>
+  return (
+    <ScrollView
+      contentContainerStyle={[styles.container, { backgroundColor: theme.colors.background }]}
+      keyboardShouldPersistTaps="handled"
+    >
+      <KeyboardAvoidingView
+        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+        style={styles.keyboardView}
+      >
+        {/* Main: form — centered, no header */}
+        <View style={styles.main}>
+          <View style={styles.centeredBlock}>
+            <Text style={[recipes.form.smsTitle, styles.smsTitleBlock]}>输入6位短信验证码</Text>
+            <Text style={[recipes.form.smsSubtitle, styles.smsSubtitleBlock]}>
+              验证码已发送至您的手机 {phoneNumber}
+            </Text>
+
+            <View style={styles.otpRowWrap}>
+              <View style={recipes.form.otpRow}>
+                {[0, 1, 2, 3, 4, 5].map((i) => (
+                  <View key={i} style={recipes.form.otpBox}>
+                    <Text style={recipes.form.otpBoxText}>
+                      {verificationCode.charAt(i) || ''}
+                    </Text>
+                  </View>
+                ))}
+              </View>
+              {/* Hidden input over the row: tap row to focus, type 123456 or paste, backspace removes last digit */}
+              <RNTextInput
+                ref={otpInputRef}
+                value={verificationCode}
+                onChangeText={handleOtpChange}
+                style={styles.hiddenOtpOverlay}
+                keyboardType="number-pad"
+                maxLength={6}
+                autoComplete="one-time-code"
+              />
+            </View>
+
+            {error ? <Text style={styles.error}>{error}</Text> : null}
+
+            <TouchableOpacity
+              style={recipes.button.primaryCtaLarge}
+              onPress={handleVerifyCode}
+              disabled={loading || isSubmitting || hasSubmitted}
+              activeOpacity={0.9}
+            >
+              <Text style={recipes.button.primaryCtaLargeText}>
+                {hasSubmitted ? '验证成功' : loading ? '验证中...' : '验证并继续'}
+              </Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={[recipes.button.resendOutline, styles.resendWrap]}
+              onPress={handleResendCode}
+              disabled={!canResend || loading}
+              activeOpacity={0.9}
+            >
+              <Text
+                style={[
+                  recipes.button.resendOutlineText,
+                  !canResend && { color: c.textMuted },
+                ]}
+              >
+                {canResend ? '重新发送验证码' : `重新发送 (${countdown}秒)`}
+              </Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity style={styles.returnWrap} onPress={() => router.back()}>
+              <Text style={recipes.link.smsReturn}>返回登录</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </KeyboardAvoidingView>
     </ScrollView>
   );
 }
@@ -279,91 +318,50 @@ export default function SmsVerificationScreen() {
 const styles = StyleSheet.create({
   container: {
     flexGrow: 1,
-    backgroundColor: '#FFFBF8',
+    justifyContent: 'center',
+    paddingHorizontal: PX_8,
+    paddingTop: PY_10,
+    paddingBottom: PB_8,
   },
-  content: {
+  keyboardView: {
     flex: 1,
-    paddingHorizontal: width * 0.12,
-    paddingTop: height * 0.20,
   },
-  titleSection: {
-    marginBottom: height * 0.04,
+  main: {
+    flex: 1,
+    justifyContent: 'center',
+    width: '100%',
+    maxWidth: MAX_W_SM,
+    alignSelf: 'center',
   },
-  title: {
-    fontSize: 32,
-    fontFamily: Platform.select({ ios: 'DM Sans', android: 'sans-serif' }),
-    color: '#0C1A30',
-    fontWeight: 'bold',
-    marginBottom: height * 0.01,
+  centeredBlock: {
+    width: '100%',
   },
-  subtitle: {
-    fontSize: 14,
-    fontFamily: Platform.select({ ios: 'Inter', android: 'sans-serif' }),
-    color: '#838589',
-    marginBottom: height * 0.03,
+  smsTitleBlock: {
+    marginBottom: 8,
   },
-  inputSection: {
-    marginBottom: height * 0.03,
+  smsSubtitleBlock: {
+    marginBottom: 24,
   },
-  inputLabel: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
+  otpRowWrap: {
+    position: 'relative',
+    alignSelf: 'center',
+  },
+  hiddenOtpOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    opacity: 0,
+    fontSize: 16,
+  },
+  resendWrap: {
+    marginTop: SPACE_Y_4,
+  },
+  returnWrap: {
+    marginTop: PT_8,
     alignItems: 'center',
-    marginBottom: height * 0.01,
-  },
-  labelText: {
-    fontSize: 12,
-    fontFamily: Platform.select({ ios: 'Inter', android: 'sans-serif' }),
-    color: '#838589',
-  },
-  input: {
-    backgroundColor: '#EDEDED',
-    borderRadius: 12,
-  },
-  inputContent: {
-    paddingVertical: height * 0.015,
-    paddingHorizontal: width * 0.04,
-  },
-  inputOutline: {
-    borderWidth: 0,
-  },
-  verifyButton: {
-    backgroundColor: '#FC9B33',
-    borderRadius: 12,
-    marginTop: height * 0.02,
-    marginBottom: height * 0.03,
-    shadowColor: '#FC9B33',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.3,
-    shadowRadius: 8,
-    elevation: 5,
-  },
-  verifyButtonContent: {
-    paddingVertical: height * 0.013,
-    paddingHorizontal: width * 0.04,
-  },
-  verifyButtonLabel: {
-    color: 'white',
-    fontSize: 18,
-    fontFamily: Platform.select({ ios: 'DM Sans', android: 'sans-serif' }),
-    fontWeight: '700',
-  },
-  button: {
-    marginTop: 8,
   },
   error: {
-    color: 'red',
-    marginBottom: 16,
+    color: c.textMain,
+    fontSize: t.fontSize.bodyMeta,
+    marginBottom: SPACE_Y_4,
     textAlign: 'center',
-  },
-  temporaryButton: {
-    marginTop: 16,
-    borderColor: '#FC9B33',
-    borderRadius: 8,
-    minWidth: 100,
-  },
-  temporaryText: {
-    color: '#FC9B33',
-    fontSize: 14,
   },
 });

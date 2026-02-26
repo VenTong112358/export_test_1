@@ -56,6 +56,8 @@ import { stemmer } from 'stemmer';
 import { SentenceSelectionModal } from './components/SentenceSelectionModal';
 import { useDailyLearningLog } from './hooks/useDailyLearningLog';
 import { useStreamingHighlighter } from './hooks/useStreamingHighlighter';
+import { recipes } from '../constants/recipes';
+import { designTokensColors as c, typography as t } from '../constants/designTokens';
 
 // Import sentence splitter hook
 import { SpeakApi } from '@data/api/SpeakApi';
@@ -821,8 +823,8 @@ const PassageMainPage: React.FC<PassageMainProps> = ({
           windowHeight: Dimensions.get('window').height
         });
 
-        // Calculate modal direction - default to above word
-        const GAP = 8;
+        // Calculate modal direction — small gap so popup sits close to word
+        const GAP = 2;
         const modalHeight = 160;
         const modalWidth = Math.min(articleWidth || Dimensions.get('window').width, 300); // Modal width
           const windowHeight = Dimensions.get('window').height || 800;
@@ -901,10 +903,7 @@ const PassageMainPage: React.FC<PassageMainProps> = ({
       dispatch(setShowModal(true));
     }
 
-    // Only show guess modal for unlearned words, let the API handle the lookup modal
-    if (wordAnalysis.type === 'unlearned') {
-      setShowGuessModal(true);
-    }
+    // Show only the definition lookup modal (no second guess modal)
   }, [dispatch, logId, selectedWords, articleWidth, isEnglishTranslationMode]);
 
   const handleWordDefinition = useCallback(async (word: string, uniqueWordKey?: string, pressEvent?: any) => {
@@ -1263,7 +1262,7 @@ const PassageMainPage: React.FC<PassageMainProps> = ({
     const segments = processTextWithHighlights(displayText);
 
     return (
-      <Text style={[styles.articleText, { fontSize, lineHeight: lineHeight * fontSize, width: '100%' }]}>
+      <Text style={[pr.articleBody, { fontSize, lineHeight: lineHeight * fontSize, width: '100%', color: theme.colors.primary }]}>
         {segments.map((segment, i) => {
           const clean = segment.text.replace(/[^\w]/g, '').toLowerCase();
           const key = `stream-${clean}-${i}`;
@@ -1272,11 +1271,10 @@ const PassageMainPage: React.FC<PassageMainProps> = ({
               key={key}
               ref={r => { wordRefs.current[key] = r; }}
               style={[
-                styles.sentenceText,
-                { fontSize, lineHeight: lineHeight * fontSize },
-                segment.isHighlighted && styles.streamingWordHighlight,
-                segment.isReviewed && showReviewedWords && styles.reviewedWordHighlight,
-                isWordQueried(segment.text) && styles.queriedWordUnderline,
+                pr.articleBody,
+                { fontSize, lineHeight: lineHeight * fontSize, color: theme.colors.primary },
+                isWordQueried(segment.text) ? pr.wordQueried : (segment.isHighlighted && pr.wordNew),
+                segment.isReviewed && showReviewedWords && pr.wordReview,
               ]}
               onPress={(e) => {
                 if (!/^[a-zA-Z]+$/.test(clean)) return;
@@ -1323,8 +1321,8 @@ const PassageMainPage: React.FC<PassageMainProps> = ({
           {/* Render a single flowing paragraph Text, with inline sentence wrappers */}
           <Text
             style={[
-              styles.paragraphText,
-              { fontSize, lineHeight: lineHeight * fontSize },
+              pr.articleBody,
+              { fontSize, lineHeight: lineHeight * fontSize, color: theme.colors.primary },
             ]}
           >
             {paragraph.sentences.map((sentence, idx) => (
@@ -1372,11 +1370,10 @@ const PassageMainPage: React.FC<PassageMainProps> = ({
             wordRefs.current[uniqueWordKey] = ref; // 使用唯一key存储ref
           }}
           style={[
-            styles.sentenceText,
-            { fontSize, lineHeight: lineHeight * fontSize },
-            segment.isHighlighted && styles.streamingWordHighlight,
-            segment.isReviewed && showReviewedWords && styles.reviewedWordHighlight,
-            isWordQueried(segment.text) && styles.queriedWordUnderline
+            pr.articleBody,
+            { fontSize, lineHeight: lineHeight * fontSize, color: theme.colors.primary },
+            isWordQueried(segment.text) ? pr.wordQueried : (segment.isHighlighted && pr.wordNew),
+            segment.isReviewed && showReviewedWords && pr.wordReview,
           ]}
           onPress={(e) => {
             // If it's a reviewed word (green highlight), show definition directly (not quiz)
@@ -1498,14 +1495,19 @@ const PassageMainPage: React.FC<PassageMainProps> = ({
     );
   }
 
+  const pr = recipes.passageReading;
+
   return (
-    <SafeAreaView style={[styles.container, { backgroundColor: theme.colors.background }]}>
-      {/* Header with embedded reading controls */}
+    <SafeAreaView style={[pr.screen, { backgroundColor: theme.colors.background }]}>
+      {/* Header: academic theme — back + title + reading controls */}
       <Header
         title="仝文馆"
         showBackButton={true}
         showNotificationButton={false}
         onBackPress={handleBackPress}
+        backgroundColor={theme.colors.background}
+        titleColor={theme.colors.primary}
+        iconColor={theme.colors.primary}
         customRightComponent={
           <HeaderReadingControls
             fontSize={fontSize}
@@ -1524,8 +1526,13 @@ const PassageMainPage: React.FC<PassageMainProps> = ({
         }
       />
 
+      {/* Reading progress bar — 1px track, fill primary */}
+      <View style={[pr.progressTrack, { backgroundColor: theme.colors.border }]}>
+        <View style={[pr.progressFill, { width: '25%', backgroundColor: theme.colors.primary }]} />
+      </View>
+
       {/* Article Content */}
-      <View style={styles.articleContainer}>
+      <View style={pr.articleContainer}>
         {isLoading ? (
           <View style={styles.loadingContainer}>
             <Text style={styles.loadingText}>正在生成文章...</Text>
@@ -1550,18 +1557,18 @@ const PassageMainPage: React.FC<PassageMainProps> = ({
               setArticleX(prev => (prev === x ? prev : x));
             }}
           >
-            {/* Title Section */}
+            {/* Title Section — academic theme */}
             <View style={styles.titleSection}>
-              <Text style={styles.articleTitle}>{log?.english_title || 'Article'}</Text>
-              <Text style={styles.articleSubtitle}>{log?.chinese_title || ''}</Text>
-              <View style={styles.titleSeparator} />
-              <Text style={styles.aiGeneratedLabel}>(AI生成)</Text>
+              <Text style={[pr.articleTitle, { color: theme.colors.primary }]}>{log?.english_title || 'Article'}</Text>
+              <Text style={[pr.articleSubtitle, { color: theme.colors.onSurfaceVariant }]}>{log?.chinese_title || ''}</Text>
+              <View style={[pr.titleSeparator, { backgroundColor: theme.colors.border }]} />
+              <Text style={[styles.aiGeneratedLabel, { color: theme.colors.onSurfaceVariant }]}>(AI生成)</Text>
             </View>
 
             {/* Article Content - 根据showTranslation状态显示原文或翻译 */}
             <View style={styles.articleTextContainer}>
               {showTranslation && translatedContent ? (
-                <Text style={[styles.articleContent, { fontSize, lineHeight: lineHeight * fontSize }]}>
+                <Text style={[pr.articleBody, { fontSize, lineHeight: lineHeight * fontSize, color: theme.colors.primary }]}>
                   {translatedContent}
                 </Text>
               ) : (
@@ -1589,7 +1596,7 @@ const PassageMainPage: React.FC<PassageMainProps> = ({
 
             {/* Show streaming indicator if still generating */}
             {isStreaming && (
-              <View style={styles.streamingIndicator}>
+              <View style={[styles.streamingIndicator, { backgroundColor: theme.colors.primary }]}>
                 <Text style={styles.streamingText}>正在生成...</Text>
               </View>
             )}
@@ -1612,13 +1619,15 @@ const PassageMainPage: React.FC<PassageMainProps> = ({
       />
       */}
 
-      {/* Complete Learning Button */}
-      <View style={styles.bottomContainer}>
+      {/* Finish Reading — academic footer */}
+      <View style={[pr.bottomBar, { backgroundColor: theme.colors.background, borderTopColor: theme.colors.border }]}>
         <TouchableOpacity
-          style={styles.completeButton}
+          style={[pr.finishButton, { backgroundColor: theme.colors.primary }]}
           onPress={handleFinishReading}
+          activeOpacity={0.9}
         >
-          <Text style={styles.completeButtonText}>完成阅读</Text>
+          <Text style={pr.finishButtonText}>结束阅读</Text>
+          <Ionicons name="checkmark" size={18} color={c.cardBg} />
         </TouchableOpacity>
       </View>
 
@@ -1674,25 +1683,21 @@ const PassageMainPage: React.FC<PassageMainProps> = ({
                   borderBottomWidth: 12,
                   borderLeftColor: 'transparent',
                   borderRightColor: 'transparent',
-                  borderBottomColor: '#FFF3E6',
+                  borderBottomColor: c.cardBg,
                 }}
               />
             )}
-            {/* 弹窗主体 */}
+            {/* 弹窗主体 — card recipe */}
             <View
-              style={{
-                backgroundColor: '#FFF3E6',
-                borderRadius: 16,
-                padding: 18,
-                paddingHorizontal: 26,
-                width: Math.min(articleWidth, 300), // 限制最大宽度
-                alignItems: 'center',
-                shadowColor: '#000',
-                shadowOffset: { width: 0, height: 4 },
-                shadowOpacity: 0.18,
-                shadowRadius: 8,
-                elevation: 8,
-              }}
+              style={[
+                recipes.card.default,
+                {
+                  padding: 18,
+                  paddingHorizontal: 26,
+                  width: Math.min(articleWidth, 300),
+                  alignItems: 'center',
+                },
+              ]}
             >
               {/* First Row: Word + Buttons */}
               <View style={styles.wordModalFirstRow}>
@@ -1721,7 +1726,7 @@ const PassageMainPage: React.FC<PassageMainProps> = ({
               <View
                 style={{
                   position: 'absolute',
-                  left: Math.max(0, Math.min(wordModalPosition.x - wordModalLeft - 12, Math.min(articleWidth, 300) - 24)), // 确保三角形在弹窗内
+                  left: Math.max(0, Math.min(wordModalPosition.x - wordModalLeft - 12, Math.min(articleWidth, 300) - 24)),
                   bottom: -12,
                   width: 0,
                   height: 0,
@@ -1730,7 +1735,7 @@ const PassageMainPage: React.FC<PassageMainProps> = ({
                   borderTopWidth: 12,
                   borderLeftColor: 'transparent',
                   borderRightColor: 'transparent',
-                  borderTopColor: '#FFF3E6',
+                  borderTopColor: c.cardBg,
                 }}
               />
             )}
@@ -1776,7 +1781,7 @@ const PassageMainPage: React.FC<PassageMainProps> = ({
         onRequestClose={() => setShowGuessModal(false)}
       >
         <View style={styles.modalContainer}>
-          <View style={styles.modalContent}>
+          <View style={[recipes.card.default, styles.modalContent]}>
             {!showCheckmark ? (
               <>
                 <Text style={styles.modalTitle}>Guess the Word</Text>
@@ -1915,28 +1920,24 @@ const PassageMainPage: React.FC<PassageMainProps> = ({
                   borderBottomWidth: 12,
                   borderLeftColor: 'transparent',
                   borderRightColor: 'transparent',
-                  borderBottomColor: '#FFF3E6',
+                  borderBottomColor: c.cardBg,
                   zIndex: 101,
                 }}
               />
             )}
-            {/* 弹窗主体 */}
+            {/* 弹窗主体 — card recipe */}
             <View
-              style={{
-                backgroundColor: '#FFF3E6',
-                borderRadius: 16,
-                padding: 14,
-                paddingHorizontal: 16,
-                width: articleWidth,
-                minHeight: 70,
-                alignItems: 'center',
-                justifyContent: 'center',
-                shadowColor: '#000',
-                shadowOffset: { width: 0, height: 4 },
-                shadowOpacity: 0.18,
-                shadowRadius: 8,
-                elevation: 8,
-              }}
+              style={[
+                recipes.card.default,
+                {
+                  padding: 14,
+                  paddingHorizontal: 16,
+                  width: articleWidth,
+                  minHeight: 70,
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                },
+              ]}
             >
               {!showCheckmark && !showWordDetails ? (
                 <View style={{ flexDirection: 'row', flexWrap: 'wrap', width: '100%' }}>
@@ -2036,7 +2037,7 @@ const PassageMainPage: React.FC<PassageMainProps> = ({
                   borderTopWidth: 12,
                   borderLeftColor: 'transparent',
                   borderRightColor: 'transparent',
-                  borderTopColor: '#FFF3E6',
+                  borderTopColor: c.cardBg,
                   zIndex: 101,
                 }}
               />
@@ -2056,19 +2057,19 @@ const SentenceAnalysisModal = ({ showSentenceAnalysisModal, setShowSentenceAnaly
       animationType="fade"
       onRequestClose={() => setShowSentenceAnalysisModal(false)}
     >
-      <View style={[styles.analysisModalContainer, { pointerEvents: 'box-none' }]}>
-        <Pressable
-          style={{
-            position: 'absolute',
-            top: 0,
-            left: 0,
-            right: 0,
-            bottom: 0,
-            zIndex: 50, // 降低背景遮罩的层级
-          }}
-          onPress={() => setShowSentenceAnalysisModal(false)}
+        <View style={[styles.analysisModalContainer, { pointerEvents: 'box-none' }]}>
+          <Pressable
+            style={{
+              position: 'absolute',
+              top: 0,
+              left: 0,
+              right: 0,
+              bottom: 0,
+              zIndex: 50,
+            }}
+            onPress={() => setShowSentenceAnalysisModal(false)}
         />
-        <View style={styles.analysisModalContent}>
+        <View style={[recipes.card.default, styles.analysisModalContent]}>
           <TouchableOpacity style={styles.closeIcon} onPress={() => setShowSentenceAnalysisModal(false)}>
             <Ionicons name="close" size={24} color="#333" />
           </TouchableOpacity>
@@ -2119,12 +2120,13 @@ const WordChoiceModal = ({
         />
         <View
           style={[
+            recipes.card.default,
             styles.wordChoiceModalContent,
             {
               position: 'absolute',
-              left: position.x - 100, // Center the modal
+              left: position.x - 100,
               top: position.y,
-              zIndex: 100, // 确保模态框内容在背景遮罩之上
+              zIndex: 100,
             }
           ]}
         >
@@ -2224,9 +2226,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   modalContent: {
-    backgroundColor: 'white',
     padding: width * 0.06,
-    borderRadius: 10,
     width: width * 0.8,
   },
   modalTitle: {
@@ -2589,8 +2589,8 @@ const styles = StyleSheet.create({
     paddingVertical: height * 0.005,
   },
   sentenceText: {
-    color: '#333',
-    fontFamily: Platform.select({ ios: 'Inter', android: 'sans-serif' }),
+    color: c.navyDeep,
+    fontFamily: t.fontFamily.articleBody,
     flexWrap: 'wrap',
   },
   articleTextContainer: {
@@ -2600,7 +2600,7 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   articleContentContainer: {
-    paddingBottom: height * 0.05, // Add some padding at the bottom for the button
+    paddingBottom: 140,
   },
   streamingText: {
     color: 'white',
@@ -2637,18 +2637,11 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   analysisModalContent: {
-    backgroundColor: '#fff',
-    borderRadius: 16,
     paddingVertical: 28,
     paddingHorizontal: 22,
     width: '80%',
     alignItems: 'center',
     position: 'relative',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.18,
-    shadowRadius: 8,
-    elevation: 8,
   },
   analysisModalTitle: {
     fontSize: 18,
@@ -2741,14 +2734,7 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(0, 0, 0, 0.3)',
   },
   wordChoiceModalContent: {
-    backgroundColor: 'white',
-    borderRadius: 12,
     width: 200,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.15,
-    shadowRadius: 8,
-    elevation: 8,
   },
   wordChoiceButton: {
     paddingVertical: 16,

@@ -1,3 +1,4 @@
+import { Ionicons } from '@expo/vector-icons';
 import { useDailyLearningLogs } from '@hooks/useDailyLearningLogs';
 import { useTheme } from '@hooks/useTheme';
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -5,17 +6,27 @@ import { useFocusEffect } from '@react-navigation/native';
 import { useRouter, useSegments } from 'expo-router';
 import React, { useEffect, useState } from 'react';
 import { Dimensions, Image, Modal, Platform, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
-import { Button } from 'react-native-paper';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useSelector } from 'react-redux';
+import {
+  designTokensColors,
+  radius,
+  shadows,
+  spacing,
+  typography,
+} from '../../constants/designTokens';
+import { recipes } from '../../constants/recipes';
 import { finishStudy } from '../../data/api/FinishStudyApi';
 import type { RootState } from '../../data/repository/store';
 import CongratulationsBottomSheet from '../components/CongratulationsBottomSheet';
-import DailyProgressar from '../components/DailyProgressar';
 import { DropdownMenu } from '../components/DropdownMenu';
-import { Header } from '../components/Header';
 
 const { width, height } = Dimensions.get('window');
+const c = designTokensColors;
+const s = spacing;
+const r = radius;
+const sh = shadows;
+const t = typography;
 
 // Mock data for articles
 const articles = [
@@ -211,83 +222,148 @@ const MainPage = () => {
 
   return (
     <SafeAreaView style={[styles.container, { backgroundColor: theme.colors.background }]}>
-      <Header
-        title="仝文馆"
-        showMenuButton={false}
-        showNotificationButton={false}
-        showHamburgerMenu={true}
-        onHamburgerPress={handleHamburgerPress}
-      />
-      <Button
-        mode="contained"
-        style={{ marginVertical: 16, backgroundColor: '#007AFF' }}
-        onPress={() => router.push('/debug/test-daily-log-request')}
-      >
-        Test Daily Log API
-      </Button>
-      {/* 今日目标进度条区域 */}
-      <View style={styles.goalContainer}>
-        {/* Left: 今日目标 above the target count, both left-aligned */}
-        <View style={styles.goalLeft}>
-          <Text style={styles.goalTitle}>今日目标</Text>
-          <Text style={styles.goalCount}>{logsCount}篇</Text>
+      {/* Header: line1 = 仝文馆 + subtitle on same line; line2 = VenTong */}
+      <View style={[styles.headerWrap, { backgroundColor: theme.colors.background, borderBottomColor: theme.colors.border }]}>
+        <View style={styles.headerLeft}>
+          <View style={styles.headerTitleRow}>
+            <Text style={[styles.headerTitleSmall, styles.headerTitleChinese]}>{'仝文馆'}</Text>
+            <Text style={styles.headerSubtitleInline}>{' —— 沉浸语境，词自成章'}</Text>
+          </View>
+          <Text style={styles.headerSubtitleSmall}>VenTong</Text>
+          <View style={styles.headerDividerSmall} />
         </View>
-        {/* Middle: Progress bar */}
-        <View style={styles.goalProgressBarWrapper}>
-          <DailyProgressar
-            progress={displayProgress}
-            height={16}
-            backgroundColor={'#fff'}
-            barColor={'#FC9B33'}
-            borderRadius={8}
-          />
-        </View>
-        {/* Right: Button for finishing early */}
-        <TouchableOpacity style={styles.goalButton} onPress={handleFinishStudyEarly}>
-          <Text style={styles.goalButtonText}>提前完成</Text>
+        <TouchableOpacity style={styles.headerMenuBtn} onPress={handleHamburgerPress}>
+          <Ionicons name="menu" size={24} color={c.primary} />
         </TouchableOpacity>
       </View>
-      <ScrollView style={styles.scrollView}>
-        {/* Daily Learning Logs Section */}
-        { Array.isArray(unlearnedLogs) && unlearnedLogs.length > 0 && (
+
+      {/* Test Daily Log API — commented out
+      {__DEV__ && (
+        <Button
+          mode="contained"
+          style={[recipes.button.primaryCta, styles.testApiButtonLayout]}
+          onPress={() => router.push('/debug/test-daily-log-request')}
+        >
+          Test Daily Log API
+        </Button>
+      )}
+      */}
+
+      <ScrollView style={styles.scrollView} contentContainerStyle={styles.scrollContent}>
+        {/* Today's Progress card — compact height */}
+        <View style={[recipes.card.progress, styles.progressCardWrap]}>
+          <View style={styles.progressTopRow}>
+            <View style={styles.progressLeft}>
+              <Text style={[recipes.sectionHeader.progressLabel, styles.progressLabelLarge]}>今日进度</Text>
+              <View style={styles.progressNumberRow}>
+                <Text style={styles.progressNumber}>{completedCount}</Text>
+                <Text style={styles.progressOf}> / {logsCount}</Text>
+              </View>
+            </View>
+            <View style={styles.streakBadge}>
+              <Ionicons name="calendar" size={12} color={c.accent} />
+              <Text style={styles.streakText}>连续 {logsCount > 0 ? logsCount : 0} 天</Text>
+            </View>
+          </View>
+          <View style={[recipes.progressBar.track, styles.progressBarWrap]}>
+            <View
+              style={[
+                recipes.progressBar.fill,
+                { width: `${Math.max(0, Math.min(displayProgress, 1)) * 100}%` },
+              ]}
+            />
+          </View>
+          <View style={styles.captionRow}>
+            <Text style={styles.captionQuote} numberOfLines={1}>阅读只为心灵提供知识的材料。</Text>
+            <Text style={styles.captionPercent}>
+              {Math.round(displayProgress * 100)}%
+            </Text>
+          </View>
+          <TouchableOpacity
+            style={[recipes.button.primaryCta, styles.earlyFinishBtn]}
+            onPress={handleFinishStudyEarly}
+          >
+            <Text style={recipes.button.primaryCtaText}>提前完成</Text>
+          </TouchableOpacity>
+        </View>
+
+        {/* Daily Recommendations (Design_MainPage §4) */}
+        {Array.isArray(unlearnedLogs) && unlearnedLogs.length > 0 && (
           <View style={styles.dailyLogsSection}>
-            <View style={styles.sectionHeader}>
-              <Text style={styles.sectionTitle}>Recommend for you</Text>
-              <Text style={styles.sectionSubtitle}>今日推荐</Text>
+            <View style={recipes.sectionHeader.row}>
+              <Text style={[recipes.sectionHeader.title, styles.sectionTitleLarge]}>每日推荐</Text>
+              <Text style={recipes.sectionHeader.date}>
+                {new Date().toLocaleDateString('zh-CN', { year: 'numeric', month: 'long', day: 'numeric' })}
+              </Text>
             </View>
 
             {isLoading ? (
               <View style={styles.loadingContainer}>
-                <Text style={styles.loadingText}>Loading today's articles...</Text>
+                <Text style={styles.loadingText}>加载中…</Text>
               </View>
             ) : error ? (
               <View style={styles.errorContainer}>
-                <Text style={styles.errorText}>Error: {error}</Text>
+                <Text style={styles.errorText}>{error}</Text>
               </View>
             ) : (
-              unlearnedLogs.map((log: any) => (
-                <TouchableOpacity
-                  key={log.id}
-                  style={styles.logCard}
-                  // Ensure logId is a number for handleLogPress
-                  onPress={() => handleLogPress(Number(log.id), log.daily_new_word)}
-                >
-                  <View style={styles.logContent}>
-                    <Text style={styles.logTitle}>{log.english_title}</Text>
-                    <Text style={styles.logSubtitle}>{log.chinese_title}</Text>
-                    <View style={styles.logMeta}>
-                      <Text style={styles.logTag}>{log.tag}</Text>
-                      <Text style={styles.logCEFR}>CEFR: {log.CEFR}</Text>
-                    </View>
-                    <Text style={styles.logWords}>
-                      {log.daily_new_words.length} new words
-                    </Text>
+              unlearnedLogs.map((log: any, index: number) => {
+                const isFirst = index === 0;
+                const cardStyle = isFirst ? recipes.card.recommendationActive : recipes.card.recommendation;
+                return (
+                  <View key={log.id} style={[cardStyle, styles.logCardLayout]}>
+                    <TouchableOpacity
+                      style={styles.logCardTouchable}
+                      onPress={() => handleLogPress(Number(log.id), log.daily_new_word)}
+                      activeOpacity={1}
+                    >
+                      <View style={styles.logContent}>
+                        <View style={styles.logMetaRow}>
+                          <View style={recipes.badge.topicMuted}>
+                            <Text style={recipes.badge.topicMutedText}>{log.tag || '综合'}</Text>
+                          </View>
+                        </View>
+                        <Text style={styles.logTitle}>{log.english_title}</Text>
+                        {(log.chinese_title != null && log.chinese_title !== '') && (
+                          <Text style={styles.logSubtitle} numberOfLines={2}>{log.chinese_title}</Text>
+                        )}
+                        <View style={styles.logWordsRow}>
+                          <Text style={styles.logWords}>
+                            词汇：{(log.daily_new_words ?? log.daily_new_word ?? []).length} 新词
+                          </Text>
+                          <Text style={styles.logWords}>  等级：{log.CEFR || '—'}</Text>
+                        </View>
+                      </View>
+                    </TouchableOpacity>
+                    {isFirst && (
+                      <TouchableOpacity
+                        style={[recipes.button.primaryCta, styles.commenceBtn]}
+                        onPress={() => handleLogPress(Number(log.id), log.daily_new_word)}
+                      >
+                        <Text style={recipes.button.primaryCtaText}>开始阅读</Text>
+                      </TouchableOpacity>
+                    )}
                   </View>
-                </TouchableOpacity>
-              ))
+                );
+              })
             )}
           </View>
         )}
+
+        {/* Lexical Mastery block (Design_MainPage §5) */}
+        <View style={[styles.lexicalBlock, { backgroundColor: c.primary }]}>
+          <View style={styles.lexicalContent}>
+            <View>
+              <Text style={styles.lexicalLabel}>词汇掌握</Text>
+              <Text style={styles.lexicalStat}>
+                <Text style={styles.lexicalNumber}>4,820</Text>
+                <Text style={styles.lexicalUnit}> 词</Text>
+              </Text>
+            </View>
+            <TouchableOpacity style={styles.lexicalIconBtn}>
+              <Ionicons name="trending-up" size={24} color={c.cardBg} />
+            </TouchableOpacity>
+          </View>
+        </View>
          {!ONLY_SHOW_LOGS && (
           <>
           {/* Recommended Banner */}
@@ -300,7 +376,7 @@ const MainPage = () => {
           {articles.map((article) => (
             <TouchableOpacity
               key={article.id}
-              style={styles.articleCard}
+              style={[recipes.card.recommendation, styles.articleCardLayout]}
               // article.id is string, handleArticlePress expects string
               onPress={() => handleArticlePress(article.id)}
             >
@@ -316,10 +392,10 @@ const MainPage = () => {
           {__DEV__ && (
             <View style={styles.testSection}>
               <TouchableOpacity
-                style={styles.testButton}
+                style={[recipes.button.primaryCta, styles.testButtonLayout]}
                 onPress={() => router.push('../../test')}
               >
-                <Text style={styles.testButtonText}>🧪 Daily Learning Logs Test</Text>
+                <Text style={recipes.button.primaryCtaText}>🧪 Daily Learning Logs Test</Text>
               </TouchableOpacity>
             </View>
           )}
@@ -335,7 +411,7 @@ const MainPage = () => {
             {articles.map((article) => (
               <TouchableOpacity
                 key={`feature-${article.id}`}
-                style={styles.featureCard}
+                style={[recipes.card.recommendation, styles.featureCardLayout]}
                 onPress={() => handleArticlePress(article.id)}
               >
                 <Image source={article.image} style={styles.featureImage} />
@@ -371,16 +447,15 @@ const MainPage = () => {
         animationType="fade"
         onRequestClose={handleCancelFinish}
       >
-        <View style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.3)', justifyContent: 'center', alignItems: 'center' }}>
-          <View style={{ backgroundColor: '#eee', borderRadius: 12, padding: 32, alignItems: 'center', minWidth: 260 }}>
-            <Text style={{ fontSize: 16, color: '#333', marginBottom: 24 }}>是否确认提前完成今日学习</Text>
-            <View style={{ flexDirection: 'row', justifyContent: 'center', gap: 24 }}>
-              {/* Change the confirm button color to green */}
-              <TouchableOpacity onPress={handleConfirmFinish} style={{ backgroundColor: '#4CAF50', borderRadius: 6, paddingVertical: 8, paddingHorizontal: 24, marginHorizontal: 8 }}>
-                <Text style={{ color: 'white', fontSize: 16 }}>是</Text>
+        <View style={styles.modalOverlay}>
+          <View style={[recipes.card.default, styles.modalContentLayout]}>
+            <Text style={styles.modalMessage}>是否确认提前完成今日学习</Text>
+            <View style={styles.modalActions}>
+              <TouchableOpacity onPress={handleConfirmFinish} style={recipes.button.primaryCta}>
+                <Text style={recipes.button.primaryCtaText}>是</Text>
               </TouchableOpacity>
-              <TouchableOpacity onPress={handleCancelFinish} style={{ backgroundColor: '#bbb', borderRadius: 6, paddingVertical: 8, paddingHorizontal: 24, marginHorizontal: 8 }}>
-                <Text style={{ color: 'white', fontSize: 16 }}>否</Text>
+              <TouchableOpacity onPress={handleCancelFinish} style={styles.modalCancelButton}>
+                <Text style={styles.modalCancelButtonText}>否</Text>
               </TouchableOpacity>
             </View>
           </View>
@@ -396,303 +471,391 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   menuButton: {
-    padding: 8,
+    padding: s.cardGap,
   },
   scrollView: {
     flex: 1,
   },
+  scrollContent: {
+    paddingHorizontal: s.pageHorizontal,
+    paddingBottom: s.bottomNavPaddingBottom * 2 + 60,
+  },
+  testApiButtonLayout: {
+    marginVertical: s.cardPadding,
+  },
+  headerWrap: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: s.headerPaddingHorizontal,
+    paddingVertical: 10,
+    borderBottomWidth: 1,
+  },
+  headerLeft: {
+    flexDirection: 'column',
+    alignItems: 'flex-start',
+  },
+  headerTitleRow: {
+    flexDirection: 'row',
+    alignItems: 'baseline',
+    flexWrap: 'wrap',
+  },
+  headerTitleSmall: {
+    fontSize: 18,
+    fontWeight: t.fontWeight.bold,
+    color: c.primary,
+    fontFamily: t.fontFamily.serifChinese,
+  },
+  headerTitleChinese: {
+    fontStyle: 'italic',
+  },
+  headerSubtitleInline: {
+    fontSize: 10,
+    fontWeight: t.fontWeight.bold,
+    color: c.accent,
+    letterSpacing: 2,
+    fontFamily: t.fontFamily.body,
+  },
+  headerSubtitleSmall: {
+    fontSize: 11,
+    fontWeight: t.fontWeight.bold,
+    color: c.accent,
+    letterSpacing: 2,
+    marginTop: 2,
+  },
+  headerDividerSmall: {
+    width: 32,
+    height: 1,
+    backgroundColor: c.accent,
+    opacity: 0.3,
+    marginTop: 6,
+  },
+  headerMenuBtn: {
+    padding: 8,
+  },
+  progressLabelLarge: {
+    fontSize: 13,
+  },
+  progressCardWrap: {
+    marginTop: s.sectionVertical,
+    marginBottom: s.sectionVerticalLarge,
+    paddingVertical: 14,
+    paddingHorizontal: 18,
+  },
+  progressTopRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'flex-start',
+    marginBottom: 6,
+  },
+  progressLeft: {
+    flexDirection: 'column',
+  },
+  progressNumberRow: {
+    flexDirection: 'row',
+    alignItems: 'baseline',
+    gap: 6,
+  },
+  progressNumber: {
+    fontSize: 34,
+    fontFamily: t.fontFamily.serif,
+    fontWeight: t.fontWeight.bold,
+    color: c.primary,
+  },
+  progressOf: {
+    fontSize: 16,
+    fontFamily: t.fontFamily.serif,
+    fontStyle: 'italic',
+    color: c.textMuted,
+  },
+  streakBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    backgroundColor: c.bgCream,
+    paddingHorizontal: 6,
+    paddingVertical: 3,
+    borderRadius: r.pill,
+    borderWidth: 1,
+    borderColor: c.border,
+  },
+  streakText: {
+    fontSize: 10,
+    fontWeight: t.fontWeight.bold,
+    color: c.primary,
+  },
+  progressBarWrap: {
+    marginBottom: 8,
+  },
+  captionRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 4,
+  },
+  captionQuote: {
+    fontSize: 11,
+    fontFamily: t.fontFamily.serif,
+    fontStyle: 'italic',
+    color: c.textMuted,
+    flex: 1,
+  },
+  captionPercent: {
+    fontSize: 11,
+    fontWeight: t.fontWeight.bold,
+    color: c.primary,
+  },
+  earlyFinishBtn: {
+    marginTop: 4,
+  },
+  lexicalBlock: {
+    borderRadius: r.cardLarge,
+    padding: s.cardPaddingLarge,
+    marginTop: s.sectionVerticalLarge,
+    marginBottom: s.sectionVertical,
+    overflow: 'hidden',
+  },
+  lexicalContent: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'flex-end',
+  },
+  lexicalLabel: {
+    fontSize: t.fontSize.sectionLabel,
+    fontWeight: t.fontWeight.bold,
+    color: c.cardBg,
+    opacity: 0.6,
+    marginBottom: 8,
+    letterSpacing: 2,
+  },
+  lexicalStat: {},
+  lexicalNumber: {
+    fontSize: 30,
+    fontFamily: t.fontFamily.serif,
+    fontWeight: t.fontWeight.bold,
+    fontStyle: 'italic',
+    color: c.cardBg,
+  },
+  lexicalUnit: {
+    fontSize: 14,
+    color: c.cardBg,
+    opacity: 0.8,
+    marginLeft: 4,
+  },
+  lexicalIconBtn: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: 'rgba(255,255,255,0.1)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  logCardTouchable: {
+    padding: s.cardPadding,
+  },
+  logMetaRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'flex-start',
+    marginBottom: 12,
+  },
+  commenceBtn: {
+    marginHorizontal: s.cardPadding,
+    marginBottom: s.cardPadding,
+  },
   recommendationBanner: {
-    backgroundColor: '#FC9B33',
-    padding: width * 0.04,
-    margin: width * 0.04,
-    borderRadius: 5,
+    backgroundColor: c.primary,
+    padding: s.cardPadding,
+    margin: s.pageHorizontal,
+    borderRadius: r.card,
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
   },
   recommendationTitle: {
-    color: 'white',
-    fontSize: 18,
-    fontFamily: Platform.select({ ios: 'Iowan Old Style', android: 'serif' }),
-    fontWeight: '700',
+    color: c.cardBg,
+    fontSize: t.fontSize.cardTitle,
+    fontFamily: t.fontFamily.serif,
+    fontWeight: t.fontWeight.bold,
   },
   recommendationSubtitle: {
-    color: 'white',
-    fontSize: 15,
-    fontFamily: Platform.select({ ios: 'Inter', android: 'sans-serif' }),
-    fontWeight: '600',
+    color: c.cardBg,
+    fontSize: t.fontSize.ctaStat,
+    fontFamily: t.fontFamily.body,
+    fontWeight: t.fontWeight.semibold,
   },
-  articleCard: {
-    marginHorizontal: width * 0.04,
-    marginBottom: height * 0.02,
-    borderRadius: 5,
-    backgroundColor: 'white',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 3,
+  articleCardLayout: {
+    marginHorizontal: s.pageHorizontal,
+    marginBottom: s.sectionVertical,
   },
   articleImage: {
     width: '100%',
     height: height * 0.25,
-    borderTopLeftRadius: 5,
-    borderTopRightRadius: 5,
+    borderTopLeftRadius: r.card,
+    borderTopRightRadius: r.card,
   },
   articleContent: {
-    padding: width * 0.04,
+    padding: s.cardPadding,
   },
   articleTitle: {
-    fontSize: 16,
-    fontFamily: Platform.select({ ios: 'DM Sans', android: 'sans-serif' }),
-    fontWeight: '700',
-    color: '#0C1A30',
-    marginBottom: height * 0.01,
+    fontSize: t.fontSize.cardTitle,
+    fontFamily: t.fontFamily.articleTitle,
+    fontWeight: t.fontWeight.bold,
+    color: c.textMain,
+    marginBottom: s.cardGap,
   },
   articleSubtitle: {
-    fontSize: 14,
-    fontFamily: Platform.select({ ios: 'Inter', android: 'sans-serif' }),
-    color: '#838589',
+    fontSize: t.fontSize.bodyMeta,
+    fontFamily: t.fontFamily.body,
+    color: c.textMuted,
   },
   featureSection: {
-    marginTop: height * 0.02,
+    marginTop: s.sectionVertical,
   },
   featureHeader: {
-    backgroundColor: '#FC9B33',
-    padding: width * 0.04,
-    borderRadius: 5,
+    backgroundColor: c.primary,
+    padding: s.cardPadding,
+    borderRadius: r.card,
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: height * 0.02,
+    marginBottom: s.sectionVertical,
   },
   featureTitle: {
-    color: 'white',
-    fontSize: 18,
-    fontFamily: Platform.select({ ios: 'Iowan Old Style', android: 'serif' }),
-    fontWeight: '700',
+    color: c.cardBg,
+    fontSize: t.fontSize.cardTitle,
+    fontFamily: t.fontFamily.serif,
+    fontWeight: t.fontWeight.bold,
   },
   featureSubtitle: {
-    color: 'white',
-    fontSize: 15,
-    fontFamily: Platform.select({ ios: 'Inter', android: 'sans-serif' }),
-    fontWeight: '600',
+    color: c.cardBg,
+    fontSize: t.fontSize.ctaStat,
+    fontFamily: t.fontFamily.body,
+    fontWeight: t.fontWeight.semibold,
   },
-  featureCard: {
+  featureCardLayout: {
     flexDirection: 'row',
-    marginHorizontal: width * 0.04,
-    marginBottom: height * 0.02,
-    backgroundColor: 'white',
-    borderRadius: 5,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 3,
+    marginHorizontal: s.pageHorizontal,
+    marginBottom: s.sectionVertical,
     alignItems: 'center',
   },
   featureImage: {
     width: width * 0.1,
     height: width * 0.1,
-    borderTopLeftRadius: 5,
-    borderBottomLeftRadius: 5,
-    margin: width * 0.02,
+    borderTopLeftRadius: r.card,
+    borderBottomLeftRadius: r.card,
+    margin: s.pageHorizontal,
   },
   featureContent: {
     flex: 1,
-    padding: width * 0.04,
+    padding: s.cardPadding,
     justifyContent: 'center',
   },
   featureCardTitle: {
-    fontSize: 14,
-    fontFamily: Platform.select({ ios: 'DM Sans', android: 'sans-serif' }),
-    fontWeight: '600',
-    color: '#0C1A30',
-    marginBottom: height * 0.005,
+    fontSize: t.fontSize.bodyMeta,
+    fontFamily: t.fontFamily.body,
+    fontWeight: t.fontWeight.semibold,
+    color: c.textMain,
+    marginBottom: 4,
   },
   featureCardSubtitle: {
-    fontSize: 12,
-    fontFamily: Platform.select({ ios: 'Inter', android: 'sans-serif' }),
-    color: '#838589',
+    fontSize: t.fontSize.cardMeta,
+    fontFamily: t.fontFamily.body,
+    color: c.textMuted,
+  },
+  sectionTitleLarge: {
+    fontSize: 13,
   },
   dailyLogsSection: {
-    marginHorizontal: width * 0.04,
-    marginBottom: height * 0.02,
+    marginHorizontal: s.pageHorizontal,
+    marginBottom: s.sectionVertical,
   },
-  sectionHeader: {
-    backgroundColor: '#FC9B33',
-    padding: width * 0.04,
-    borderRadius: 5,
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: height * 0.02,
-  },
-  sectionTitle: {
-    color: 'white',
-    fontSize: 18,
-    fontFamily: Platform.select({ ios: 'Iowan Old Style', android: 'serif' }),
-    fontWeight: '700',
-  },
-  sectionSubtitle: {
-    color: 'white',
-    fontSize: 15,
-    fontFamily: Platform.select({ ios: 'Inter', android: 'sans-serif' }),
-    fontWeight: '600',
-  },
-  logCard: {
-    backgroundColor: 'white',
-    borderRadius: 5,
-    padding: width * 0.04,
-    marginBottom: height * 0.015,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 3,
+  logCardLayout: {
+    marginBottom: s.cardGap,
   },
   logContent: {
     flex: 1,
   },
   logTitle: {
     fontSize: 16,
-    fontFamily: Platform.select({ ios: 'DM Sans', android: 'sans-serif' }),
-    fontWeight: '700',
-    color: '#0C1A30',
-    marginBottom: height * 0.005,
+    fontFamily: t.fontFamily.serif,
+    fontWeight: t.fontWeight.bold,
+    color: c.primary,
+    marginBottom: 4,
+    lineHeight: 22,
   },
   logSubtitle: {
-    fontSize: 14,
-    fontFamily: Platform.select({ ios: 'Inter', android: 'sans-serif' }),
-    color: '#838589',
-    marginBottom: height * 0.01,
+    fontSize: t.fontSize.bodyMeta,
+    fontFamily: t.fontFamily.body,
+    color: c.textMuted,
+    marginBottom: 8,
   },
-  logMeta: {
+  logWordsRow: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
-    marginBottom: height * 0.005,
-  },
-  logTag: {
-    fontSize: 12,
-    fontFamily: Platform.select({ ios: 'Inter', android: 'sans-serif' }),
-    color: '#4CAF50',
-    backgroundColor: '#E8F5E8',
-    paddingHorizontal: 8,
-    paddingVertical: 2,
-    borderRadius: 3,
-  },
-  logCEFR: {
-    fontSize: 12,
-    fontFamily: Platform.select({ ios: 'Inter', android: 'sans-serif' }),
-    color: '#FF9800',
-    backgroundColor: '#FFF3E0',
-    paddingHorizontal: 8,
-    paddingVertical: 2,
-    borderRadius: 3,
+    alignItems: 'center',
+    flexWrap: 'wrap',
   },
   logWords: {
-    fontSize: 12,
-    fontFamily: Platform.select({ ios: 'Inter', android: 'sans-serif' }),
-    color: '#2196F3',
-    backgroundColor: '#E3F2FD',
-    paddingHorizontal: 8,
-    paddingVertical: 2,
-    borderRadius: 3,
-    alignSelf: 'flex-start',
+    fontSize: t.fontSize.sectionLabel,
+    fontFamily: t.fontFamily.serif,
+    fontWeight: t.fontWeight.bold,
+    color: c.primary,
   },
   loadingContainer: {
-    padding: width * 0.04,
+    padding: s.cardPadding,
     alignItems: 'center',
   },
   loadingText: {
-    fontSize: 14,
-    color: '#666',
-    fontFamily: Platform.select({ ios: 'Inter', android: 'sans-serif' }),
+    fontSize: t.fontSize.bodyMeta,
+    color: c.textMuted,
+    fontFamily: t.fontFamily.body,
   },
   errorContainer: {
-    padding: width * 0.04,
+    padding: s.cardPadding,
     alignItems: 'center',
   },
   errorText: {
-    fontSize: 14,
-    color: '#F44336',
-    fontFamily: Platform.select({ ios: 'Inter', android: 'sans-serif' }),
+    fontSize: t.fontSize.bodyMeta,
+    color: c.primary,
+    fontFamily: t.fontFamily.body,
   },
   testSection: {
-    marginHorizontal: width * 0.04,
-    marginBottom: height * 0.02,
+    marginHorizontal: s.pageHorizontal,
+    marginBottom: s.sectionVertical,
   },
-  testButton: {
-    backgroundColor: '#FF5722',
-    padding: width * 0.04,
-    borderRadius: 8,
-    alignItems: 'center',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 3,
-  },
-  testButtonText: {
-    color: 'white',
-    fontSize: 16,
-    fontWeight: 'bold',
-    fontFamily: Platform.select({ ios: 'DM Sans', android: 'sans-serif' }),
-  },
-  goalContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: width * 0.04,
-    paddingVertical: height * 0.015,
-    backgroundColor: '#FFFBF8', // Match Header color
-    borderRadius: 5,
-    marginHorizontal: width * 0.04,
-    marginBottom: height * 0.02,
-    marginTop: 24, // Add space below Header
-    // Shadow for iOS
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.10,
-    shadowRadius: 8,
-    // Elevation for Android
-    elevation: 6,
-  },
-  goalLeft: {
-    flexDirection: 'column', // Stack vertically
-    alignItems: 'flex-start', // Left align
-    justifyContent: 'center',
-    minWidth: 60,
-  },
-  goalTitle: {
-    color: 'black',
-    fontSize: 12,
-    fontFamily: Platform.select({ ios: 'Inter', android: 'sans-serif' }),
-    fontWeight: '600',
-    marginBottom: 2,
-  },
-  goalCount: {
-    color: '#FC9B33',
-    fontSize: 24,
-    fontFamily: Platform.select({ ios: 'Inter', android: 'sans-serif' }),
-    fontWeight: '500',
-    flexDirection: 'row',
-  },
-  goalProgressBarWrapper: {
+  testButtonLayout: {},
+  modalOverlay: {
     flex: 1,
-    marginHorizontal: width * 0.02,
+    backgroundColor: 'rgba(0,0,0,0.3)',
+    justifyContent: 'center',
+    alignItems: 'center',
   },
-  goalButton: {
-    backgroundColor: '#FC9B33',
-    paddingVertical: height * 0.005,
-    paddingHorizontal: width * 0.02,
-    borderRadius: 5,
+  modalContentLayout: {
+    padding: s.cardPaddingLarge,
+    alignItems: 'center',
+    minWidth: 260,
   },
-  goalButtonText: {
-    color: 'white',
-    fontSize: 12,
-    fontFamily: Platform.select({ ios: 'Inter', android: 'sans-serif' }),
-    fontWeight: '600',
+  modalMessage: {
+    fontSize: t.fontSize.cardTitle,
+    color: c.textMain,
+    marginBottom: s.sectionVertical,
+  },
+  modalActions: {
+    flexDirection: 'row',
+    justifyContent: 'center',
+    gap: s.sectionVertical,
+  },
+  modalCancelButton: {
+    backgroundColor: c.border,
+    borderRadius: r.button,
+    paddingVertical: s.cardGap,
+    paddingHorizontal: s.cardPadding,
+    marginHorizontal: s.cardGap,
+  },
+  modalCancelButtonText: {
+    color: c.textMain,
+    fontSize: t.fontSize.cardTitle,
+    fontWeight: t.fontWeight.bold,
   },
 });
 

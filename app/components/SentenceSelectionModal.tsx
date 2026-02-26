@@ -13,6 +13,8 @@ import { Ionicons } from '@expo/vector-icons';
 import { useDispatch, useSelector } from 'react-redux';
 import { RootState, AppDispatch } from '@data/repository/store';
 import { saveSentence, unsaveSentence } from '@data/usecase/SentenceFavouriteUseCase';
+import { recipes } from '../../constants/recipes';
+import { designTokensColors as c } from '../../constants/designTokens';
 
 const { width, height } = Dimensions.get('window');
 
@@ -179,11 +181,12 @@ export const SentenceSelectionModal: React.FC<SentenceSelectionModalProps> = ({
         />
         {direction === 'down' && (
           <View style={{ position: 'absolute', left: triangleLeft, top: modalY - 12, width: 0, height: 0, zIndex: 10 }}>
-            <View style={styles.triangle} />
+            <View style={[styles.triangle, { borderBottomColor: c.cardBg }]} />
           </View>
         )}
         <View
           style={[
+            recipes.card.default,
             styles.modalContainer,
             {
               left: modalX,
@@ -236,7 +239,7 @@ export const SentenceSelectionModal: React.FC<SentenceSelectionModalProps> = ({
         </View>
         {direction === 'up' && (
           <View style={{ position: 'absolute', left: triangleLeft, top: modalY + modalMinHeight, width: 0, height: 0, zIndex: 10 }}>
-            <View style={[styles.triangle, { transform: [{ rotate: '180deg' }] }]} />
+            <View style={[styles.triangle, { borderBottomColor: c.cardBg, transform: [{ rotate: '180deg' }] }]} />
           </View>
         )}
       </View>
@@ -252,16 +255,8 @@ const styles = StyleSheet.create({
   },
   modalContainer: {
     position: 'absolute',
-    backgroundColor: '#FFF3E6', // 改为和其他pop-up一致的颜色
-    borderRadius: 12,
     padding: 12,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.25,
-    shadowRadius: 3.84,
-    elevation: 5,
     zIndex: 20,
-    // width: '80%',
   },
   triangle: {
     width: 0,
@@ -271,7 +266,6 @@ const styles = StyleSheet.create({
     borderBottomWidth: 14,
     borderLeftColor: 'transparent',
     borderRightColor: 'transparent',
-    borderBottomColor: '#FFF3E6', // 三角形颜色也要匹配
   },
   actionButtons: {
     flexDirection: 'row',

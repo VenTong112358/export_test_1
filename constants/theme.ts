@@ -1,22 +1,32 @@
 /**
- * Below are the colors that are used in the app. The colors are defined in the light and dark mode.
- * There are many other ways to style your app. For example, [Nativewind](https://www.nativewind.dev/), [Tamagui](https://tamagui.dev/), [unistyles](https://reactnativeunistyles.vercel.app), etc.
+ * App theme and design tokens.
+ * Light/dark theme colors are aligned with Design_System.md (see constants/designTokens.ts).
  */
 
 import { Platform } from 'react-native';
 import { MD3DarkTheme, MD3LightTheme } from 'react-native-paper';
+import { designTokensColors, otp, radius, shadows, spacing, typography } from './designTokens';
 
-const tintColorLight = '#0a7ea4';
+// Re-export design tokens for convenience
+export { designTokens, designTokensColors, otp, radius, shadows, spacing, typography } from './designTokens';
+
+const tintColorLight = designTokensColors.primary;
 const tintColorDark = '#fff';
+
+/** System background: same #FDFBFA for all screens (MainPage, PassageMain, auth, etc.) */
+const systemBackground = designTokensColors.background;
 
 export const Colors = {
   light: {
-    text: '#11181C',
-    background: '#fff',
+    text: designTokensColors.textMain,
+    background: systemBackground,
     tint: tintColorLight,
-    icon: '#687076',
-    tabIconDefault: '#687076',
+    icon: designTokensColors.textMuted,
+    tabIconDefault: designTokensColors.textMuted,
     tabIconSelected: tintColorLight,
+    accent: designTokensColors.accent,
+    border: designTokensColors.border,
+    surface: designTokensColors.cardBg,
   },
   dark: {
     text: '#ECEDEE',
@@ -25,31 +35,44 @@ export const Colors = {
     icon: '#9BA1A6',
     tabIconDefault: '#9BA1A6',
     tabIconSelected: tintColorDark,
+    accent: designTokensColors.accent,
+    border: designTokensColors.border,
+    surface: '#1F1F1F',
   },
 };
 
 export const Fonts = Platform.select({
   ios: {
-    /** iOS `UIFontDescriptorSystemDesignDefault` */
     sans: 'system-ui',
-    /** iOS `UIFontDescriptorSystemDesignSerif` */
     serif: 'ui-serif',
-    /** iOS `UIFontDescriptorSystemDesignRounded` */
     rounded: 'ui-rounded',
-    /** iOS `UIFontDescriptorSystemDesignMonospaced` */
     mono: 'ui-monospace',
+    /** Design system: body / UI */
+    body: 'Inter',
+    /** Design system: editorial / titles */
+    editorial: 'Playfair Display',
+    articleBody: 'Crimson Text',
+    articleTitle: 'Playfair Display',
   },
   default: {
     sans: 'normal',
     serif: 'serif',
     rounded: 'normal',
     mono: 'monospace',
+    body: typography.fontFamily.body,
+    editorial: typography.fontFamily.serif,
+    articleBody: typography.fontFamily.articleBody,
+    articleTitle: typography.fontFamily.articleTitle,
   },
   web: {
     sans: "system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif",
     serif: "Georgia, 'Times New Roman', serif",
     rounded: "'SF Pro Rounded', 'Hiragino Maru Gothic ProN', Meiryo, 'MS PGothic', sans-serif",
     mono: "SFMono-Regular, Menlo, Monaco, Consolas, 'Liberation Mono', 'Courier New', monospace",
+    body: 'Inter',
+    editorial: 'Playfair Display',
+    articleBody: 'Crimson Text',
+    articleTitle: 'Playfair Display',
   },
 });
 
@@ -59,22 +82,53 @@ export const lightTheme = {
   ...MD3LightTheme,
   colors: {
     ...MD3LightTheme.colors,
-    primary: '#FC9B33',
-    secondary: '#0a7ea4',
-    background: '#FFFBF8',
-    surface: '#fff',
+    primary: designTokensColors.primary,
+    secondary: designTokensColors.accent,
+    background: systemBackground,
+    surface: designTokensColors.cardBg,
     error: '#B3261E',
+    // Design system aliases for Paper / useTheme
+    onSurface: designTokensColors.textMain,
+    onSurfaceVariant: designTokensColors.textMuted,
+    outline: designTokensColors.border,
+    // Extra design tokens available on theme
+    accent: designTokensColors.accent,
+    textMuted: designTokensColors.textMuted,
+    border: designTokensColors.border,
+    progressBg: designTokensColors.progressBg,
+    completedBadgeBg: designTokensColors.completedBadgeBg,
+    completedBadgeText: designTokensColors.completedBadgeText,
+    evaluationScreenBg: designTokensColors.evaluationScreenBg,
   },
+  spacing,
+  radius,
+  shadows,
+  typography,
+  otp,
 };
 
 export const darkTheme = {
   ...MD3DarkTheme,
   colors: {
     ...MD3DarkTheme.colors,
-    primary: '#FC9B33',
-    secondary: '#0a7ea4',
+    primary: designTokensColors.primary,
+    secondary: designTokensColors.accent,
     background: '#151718',
     surface: '#1F1F1F',
     error: '#F2B8B5',
+    onSurface: '#ECEDEE',
+    onSurfaceVariant: '#9BA1A6',
+    outline: designTokensColors.border,
+    accent: designTokensColors.accent,
+    textMuted: '#9BA1A6',
+    border: designTokensColors.border,
+    progressBg: '#2C2C2C',
+    completedBadgeBg: designTokensColors.completedBadgeBg,
+    completedBadgeText: designTokensColors.completedBadgeText,
   },
+  spacing,
+  radius,
+  shadows,
+  typography,
+  otp,
 };

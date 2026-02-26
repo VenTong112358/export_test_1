@@ -1,7 +1,7 @@
 # VenTong App — Complete User Workflow
 
 **What this app does (short summary)**  
-VenTong (仝文馆) is a **reading and vocabulary app** for learners. Users set a daily goal (e.g. 1–3 articles), see today’s learning sessions (each with new and review words), preview words for a session, then read an **AI-generated article** with highlighted vocabulary. In the article they can tap words to look up definitions or take short quizzes, and long-press sentences to translate or analyze. After finishing an article they rate it and see a recap; when they complete today’s goal they get a congratulations popup. The app also offers **history articles**, **saved articles**, **words and level stats**, and **profile/settings** (wordbook, daily goal, phone). This document describes the full user workflow and how each page connects.
+VenTong (仝文馆) is a **reading and vocabulary app** for learners. The app **recommends 5 articles per day**; users set a personal goal (e.g. 1–3 articles to complete). They see today’s learning sessions (each with new and review words), preview words for a session, then read an **AI-generated article** with highlighted vocabulary. In the article they can tap words to look up definitions or take short quizzes, and long-press sentences to translate or analyze. After finishing an article they rate it and see a recap; when they complete today’s goal they get a congratulations popup. The app also offers **history articles**, **saved articles**, **words and level stats**, and **profile/settings** (wordbook, daily goal, phone). This document describes the full user workflow and how each page connects.
 
 ---
 
@@ -131,6 +131,13 @@ This is the main learning loop that users repeat daily.
 ┌──────────────────────────────────────────┐
 │  (tabs)/MainPage.tsx                     │
 │                                          │
+│  **Daily recommendation:** The app      │
+│  recommends **5 articles per day**       │
+│  (shown as 5 learning log cards).       │
+│  User's **personal goal** (1/2/3 篇)     │
+│  is set in settings; progress bar       │
+│  tracks completed vs goal.              │
+│                                          │
 │  ┌─ 今日目标 (top section) ─────────────┐  │
 │  │  • "今日目标" + "X篇" (e.g. 2篇)     │  │  User sets goal: 1 / 2 / 3 articles
 │  │  • Progress bar (DailyProgressar)    │  │  per day in settings; bar shows
@@ -142,9 +149,10 @@ This is the main learning loop that users repeat daily.
 │  └──────────────────────────────────────┘  │
 │                                          │
 │  Shows:                                  │
-│  • Today's learning log cards            │
-│    (each card = 1 article session with   │
-│     new words + review words)            │
+│  • **5 recommended articles** (learning │
+│    log cards) for today; each card =    │
+│    1 article session with new words +  │
+│    review words                         │
 │  • Quick-access buttons:                 │
 │    [历史文章] [收藏文章] [我的笔记]       │
 │                                          │

@@ -1,40 +1,62 @@
 import React from 'react';
-import { View, TouchableOpacity } from 'react-native';
+import { View, TouchableOpacity, StyleSheet } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import { designTokensColors as c } from '../../constants/designTokens';
 
 interface StarRatingProps {
-  value: number;
-  max?: number;
+  value: number; // 0–5
   onChange: (value: number) => void;
-  size?: number;
-  color?: string;
-  style?: any;
+  starSize?: number;
+  gap?: number;
+  disabled?: boolean;
 }
+
+const STAR_COUNT = 5;
 
 export const StarRating: React.FC<StarRatingProps> = ({
   value,
-  max = 5,
   onChange,
-  size = 32,
-  color = '#FC9B33',
-  style,
+  starSize = 28,
+  gap = 8,
+  disabled = false,
 }) => {
   return (
-    <View style={[{ flexDirection: 'row', alignItems: 'center' }, style]}>
-      {Array.from({ length: max }).map((_, i) => (
-        <TouchableOpacity
-          key={i}
-          onPress={() => onChange(i + 1)}
-          activeOpacity={0.7}
-        >
-          <Ionicons
-            name={i < value ? 'star' : 'star-outline'}
-            size={size}
-            color={color}
-            style={{ marginHorizontal: 2 }}
-          />
-        </TouchableOpacity>
-      ))}
+    <View style={[styles.row, { gap }]}>
+      {Array.from({ length: STAR_COUNT }).map((_, i) => {
+        const rating = i + 1;
+        const filled = value >= rating;
+        return (
+          <TouchableOpacity
+            key={i}
+            onPress={() => !disabled && onChange(rating)}
+            activeOpacity={0.7}
+            style={styles.starTouch}
+            accessibilityRole="button"
+            accessibilityLabel={`${rating} star${rating > 1 ? 's' : ''}`}
+          >
+            <Ionicons
+              name={filled ? 'star' : 'star-outline'}
+              size={starSize}
+              color={filled ? c.primary : c.primary}
+              style={filled ? undefined : styles.starUnfilled}
+            />
+          </TouchableOpacity>
+        );
+      })}
     </View>
   );
-}; 
+};
+
+const styles = StyleSheet.create({
+  row: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  starTouch: {
+    padding: 4,
+  },
+  starUnfilled: {
+    opacity: 0.2,
+  },
+});

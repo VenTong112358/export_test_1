@@ -6,20 +6,26 @@ import { useTheme } from '@hooks/useTheme';
 import { useRouter } from 'expo-router';
 import React, { useRef, useState } from 'react';
 import {
-    Dimensions,
-    Modal,
-    Platform,
-    ScrollView,
-    StyleSheet,
-    Text,
-    TouchableOpacity,
-    View,
+  Dimensions,
+  Modal,
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import {
+  designTokensColors as c,
+  radius as r,
+  spacing as s,
+  typography as t
+} from '../../constants/designTokens';
+import { recipes } from '../../constants/recipes';
 import { Header } from './Header';
-// Defer importing expo-av until needed to avoid runtime crashes with version mismatch
-let Audio: any = null;
 
+let Audio: any = null;
 
 const { width, height } = Dimensions.get('window');
 
@@ -233,10 +239,13 @@ export const WordPreview: React.FC<WordPreviewProps> = ({ logId, words, onBackPr
     }
 
     return (
-      <View key={word.id} style={styles.wordItem}>
-        {/* English Column */}
-        <TouchableOpacity
-          style={styles.englishColumn}
+      <View key={word.id} style={[recipes.card.wordCard, styles.wordItemLayout]}>
+        <Pressable
+          style={({ pressed }) => [
+            recipes.card.wordCardSide,
+            styles.englishSide,
+            pressed && styles.wordCardSidePressed,
+          ]}
           onPress={() => handleEnglishWordClick(word.id)}
         >
           {shouldShowEnglish ? (
@@ -250,26 +259,31 @@ export const WordPreview: React.FC<WordPreviewProps> = ({ logId, words, onBackPr
                   style={styles.soundButton}
                   onPress={() => handleSoundPress(word.word)}
                 >
-                  <Ionicons name="volume-high-outline" size={20} color="#FC9B33" />
+                  <Ionicons name="volume-high-outline" size={20} color={c.accent} />
                 </TouchableOpacity>
               </View>
             </View>
           ) : (
-            <View style={styles.hiddenEnglishPlaceholder} />
+            <View style={styles.hiddenPlaceholder} />
           )}
-        </TouchableOpacity>
+        </Pressable>
 
-        {/* Chinese Column */}
-        <TouchableOpacity
-          style={styles.chineseColumn}
+        <View style={styles.wordCardDivider} />
+
+        <Pressable
+          style={({ pressed }) => [
+            recipes.card.wordCardSide,
+            styles.chineseSide,
+            pressed && styles.wordCardSidePressed,
+          ]}
           onPress={() => handleChineseWordClick(word.id)}
         >
           {shouldShowChinese ? (
             <Text style={styles.definitionText}>{word.definition}</Text>
           ) : (
-            <View style={styles.hiddenChinesePlaceholder} />
+            <View style={styles.hiddenPlaceholder} />
           )}
-        </TouchableOpacity>
+        </Pressable>
       </View>
     );
   };
@@ -284,68 +298,62 @@ export const WordPreview: React.FC<WordPreviewProps> = ({ logId, words, onBackPr
         onBackPress={handleBackPress}
       />
 
-      <ScrollView style={styles.scrollView}>
-        {/* Title Section */}
-        <View style={styles.titleSection}>
-          <Text style={styles.titleText}>Today's new words</Text>
-          <Text style={styles.subtitleText}>今日新学单词</Text>
-        </View>
-
-        {/* Test Button for Reviewed Words */}
-        {__DEV__ && (
-          <View style={styles.testSection}>
-            <TouchableOpacity
-              style={styles.testButton}
-              onPress={() => {
-                console.log('[WordPreview] Current reviewed words:', currentReviewedWords);
-                console.log('[WordPreview] Reviewed words count:', currentReviewedWords.length);
-                setShowReviewedWordsModal(true);
-              }}
-            >
-              <Text style={styles.testButtonText}>
-                🧪 Show Reviewed Words ({currentReviewedWords.length})
-              </Text>
-            </TouchableOpacity>
-          </View>
-        )}
-
-        {/* Toggle Controls */}
-        <View style={styles.toggleSection}>
-          <TouchableOpacity
-            style={[styles.toggleButton, !englishHidden && styles.toggleButtonActive]}
-            onPress={handleToggleEnglish}
-          >
-            <Text style={[styles.toggleButtonText, !englishHidden && styles.toggleButtonTextActive]}>
-              {englishHidden ? '显示英文' : '隐藏英文'}
-            </Text>
-          </TouchableOpacity>
-          
-          <TouchableOpacity
-            style={[styles.toggleButton, !chineseHidden && styles.toggleButtonActive]}
-            onPress={handleToggleChinese}
-          >
-            <Text style={[styles.toggleButtonText, !chineseHidden && styles.toggleButtonTextActive]}>
-              {chineseHidden ? '显示中文' : '隐藏中文'}
-            </Text>
-          </TouchableOpacity>
-        </View>
-
-        {/* Words List */}
+      <ScrollView style={styles.scrollView} contentContainerStyle={styles.scrollContent}>
+        {/* Section: New Academic Terms */}
         <View style={styles.wordsSection}>
-          <Text style={styles.wordsSectionTitle}>
-            {words.length} new words to learn
-          </Text>
+          <View style={recipes.sectionHeader.wordPreviewRow}>
+            <View style={recipes.badge.badgeGreen}>
+              <Text style={recipes.badge.badgeGreenText}>New Academic Terms</Text>
+            </View>
+            <Text style={recipes.sectionHeader.wordPreviewCount}>
+              {words.length} ITEMS
+            </Text>
+          </View>
+
+          {__DEV__ && (
+            <View style={styles.testSection}>
+              <TouchableOpacity
+                style={[recipes.button.primaryCta, styles.testButtonLayout]}
+                onPress={() => {
+                  setShowReviewedWordsModal(true);
+                }}
+              >
+                <Text style={recipes.button.primaryCtaText}>
+                  🧪 Show Reviewed Words ({currentReviewedWords.length})
+                </Text>
+              </TouchableOpacity>
+            </View>
+          )}
+
           {words.map(renderWordItem)}
         </View>
       </ScrollView>
 
-      {/* Start Learning Button */}
-      <View style={styles.bottomSection}>
+      {/* Footer: Hide English / Show Chinese + 开始阅读 */}
+      <View style={[styles.footer, { backgroundColor: theme.colors.background }]}>
+        <View style={styles.footerToggleRow}>
+          <TouchableOpacity
+            style={[recipes.button.secondaryOutline, !englishHidden && styles.toggleActive]}
+            onPress={handleToggleEnglish}
+          >
+            <Text style={recipes.button.secondaryOutlineText}>
+              {englishHidden ? '显示英文' : '隐藏英文'}
+            </Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={[recipes.button.secondaryOutline, !chineseHidden && styles.toggleActive]}
+            onPress={handleToggleChinese}
+          >
+            <Text style={recipes.button.secondaryOutlineText}>
+              {chineseHidden ? '显示中文' : '隐藏中文'}
+            </Text>
+          </TouchableOpacity>
+        </View>
         <TouchableOpacity
-          style={styles.startLearningButton}
+          style={recipes.button.primaryCtaLarge}
           onPress={handleStartLearning}
         >
-          <Text style={styles.startLearningButtonText}>Start Today's Learning</Text>
+          <Text style={recipes.button.primaryCtaLargeText}>开始阅读</Text>
         </TouchableOpacity>
       </View>
 
@@ -357,17 +365,16 @@ export const WordPreview: React.FC<WordPreviewProps> = ({ logId, words, onBackPr
         onRequestClose={() => setShowReviewedWordsModal(false)}
       >
         <View style={styles.modalOverlay}>
-          <View style={styles.modalContent}>
+          <View style={[recipes.card.default, styles.modalContentLayout]}>
             <View style={styles.modalHeader}>
               <Text style={styles.modalTitle}>Reviewed Words</Text>
               <TouchableOpacity
                 onPress={() => setShowReviewedWordsModal(false)}
                 style={styles.modalCloseButton}
               >
-                <Ionicons name="close" size={24} color="#333" />
+                <Ionicons name="close" size={24} color={c.primary} />
               </TouchableOpacity>
             </View>
-            
             <ScrollView style={styles.modalScrollView}>
               {currentReviewedWords.length === 0 ? (
                 <Text style={styles.emptyText}>No reviewed words found</Text>
@@ -383,7 +390,7 @@ export const WordPreview: React.FC<WordPreviewProps> = ({ logId, words, onBackPr
                         style={styles.soundButton}
                         onPress={() => handleSoundPress(word.word)}
                       >
-                        <Ionicons name="volume-high-outline" size={20} color="#FC9B33" />
+                        <Ionicons name="volume-high-outline" size={20} color={c.accent} />
                       </TouchableOpacity>
                     </View>
                     <Text style={styles.reviewedDefinitionText}>{word.definition}</Text>
@@ -405,85 +412,48 @@ const styles = StyleSheet.create({
   scrollView: {
     flex: 1,
   },
-  titleSection: {
-    backgroundColor: '#FC9B33',
-    padding: width * 0.04,
-    margin: width * 0.04,
-    borderRadius: 5,
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-  },
-  titleText: {
-    color: 'white',
-    fontSize: 18,
-    fontFamily: Platform.select({ ios: 'Iowan Old Style', android: 'serif' }),
-    fontWeight: '700',
-  },
-  subtitleText: {
-    color: 'white',
-    fontSize: 15,
-    fontFamily: Platform.select({ ios: 'Inter', android: 'sans-serif' }),
-    fontWeight: '600',
-  },
-  toggleSection: {
-    flexDirection: 'row',
-    justifyContent: 'space-around',
-    paddingHorizontal: width * 0.04,
-    marginBottom: height * 0.02,
-  },
-  toggleButton: {
-    backgroundColor: '#E8F5E8',
-    paddingHorizontal: width * 0.04,
-    paddingVertical: height * 0.015,
-    borderRadius: 20,
-    borderWidth: 2,
-    borderColor: '#4CAF50',
-  },
-  toggleButtonActive: {
-    backgroundColor: '#4CAF50',
-  },
-  toggleButtonText: {
-    color: '#4CAF50',
-    fontSize: 14,
-    fontWeight: '600',
-    fontFamily: Platform.select({ ios: 'DM Sans', android: 'sans-serif' }),
-  },
-  toggleButtonTextActive: {
-    color: 'white',
+  scrollContent: {
+    paddingHorizontal: s.pageHorizontal,
+    paddingBottom: 160,
   },
   wordsSection: {
-    paddingHorizontal: width * 0.04,
+    marginBottom: s.sectionVertical,
   },
-  wordsSectionTitle: {
-    fontSize: 16,
-    fontWeight: 'bold',
-    color: '#333',
-    marginBottom: height * 0.02,
-    fontFamily: Platform.select({ ios: 'DM Sans', android: 'sans-serif' }),
+  testSection: {
+    marginBottom: s.cardGap,
   },
-  wordItem: {
-    backgroundColor: 'white',
-    padding: width * 0.04,
-    marginBottom: height * 0.015,
-    borderRadius: 8,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 3,
+  testButtonLayout: {
+    marginBottom: s.cardGap,
+  },
+  toggleActive: {
+    backgroundColor: 'rgba(26, 43, 60, 0.1)',
+  },
+  footer: {
+    paddingHorizontal: s.pageHorizontal,
+    paddingTop: 16,
+    paddingBottom: s.bottomNavPaddingBottom,
+    borderTopWidth: 1,
+    borderTopColor: c.border,
+  },
+  footerToggleRow: {
     flexDirection: 'row',
-    alignItems: 'center',
+    gap: 12,
+    marginBottom: 16,
   },
-  englishColumn: {
-    flex: 1,
-    paddingRight: width * 0.02,
-    borderRightWidth: 1,
-    borderRightColor: '#e0e0e0',
+  wordItemLayout: {
+    marginBottom: 12,
   },
-  chineseColumn: {
-    flex: 1,
-    paddingLeft: width * 0.02,
+  englishSide: {
+    borderRightWidth: 0,
+  },
+  chineseSide: {},
+  wordCardSidePressed: {
+    backgroundColor: c.wordCardTapBg,
+  },
+  wordCardDivider: {
+    width: 1,
+    backgroundColor: c.border,
+    alignSelf: 'stretch',
   },
   englishContent: {
     alignItems: 'center',
@@ -499,89 +469,37 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   wordText: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    color: '#0C1A30',
-    marginBottom: height * 0.005,
+    fontSize: t.fontSize.cardTitle,
+    fontWeight: t.fontWeight.bold,
+    color: c.primary,
+    marginBottom: 4,
+    fontFamily: t.fontFamily.serif,
     textAlign: 'center',
-    fontFamily: Platform.select({ ios: 'DM Sans', android: 'sans-serif' }),
   },
   phoneticText: {
-    fontSize: 14,
-    color: '#666',
+    fontSize: t.fontSize.sectionLabel,
+    fontWeight: t.fontWeight.medium,
+    color: c.textMuted,
     fontStyle: 'italic',
+    fontFamily: t.fontFamily.body,
     textAlign: 'center',
-    fontFamily: Platform.select({ ios: 'Inter', android: 'sans-serif' }),
   },
   soundButton: {
     padding: 8,
   },
   definitionText: {
-    fontSize: 16,
-    color: '#333',
+    fontSize: t.fontSize.bodyMeta,
+    color: c.textMain,
     lineHeight: 22,
+    fontFamily: t.fontFamily.serifChinese,
     textAlign: 'center',
-    fontFamily: Platform.select({ ios: 'Inter', android: 'sans-serif' }),
   },
-
-  hiddenEnglishPlaceholder: {
-    height: 40,
-    backgroundColor: '#f0f0f0',
-    borderRadius: 4,
+  hiddenPlaceholder: {
+    minHeight: 40,
+    backgroundColor: c.progressBg,
+    borderRadius: r.tag,
     justifyContent: 'center',
     alignItems: 'center',
-  },
-  hiddenChinesePlaceholder: {
-    height: 40,
-    backgroundColor: '#f0f0f0',
-    borderRadius: 4,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  bottomSection: {
-    paddingHorizontal: width * 0.04,
-    paddingVertical: height * 0.02,
-    backgroundColor: 'white',
-    borderTopWidth: 1,
-    borderTopColor: 'rgba(0, 0, 0, 0.05)',
-  },
-  startLearningButton: {
-    backgroundColor: '#FC9B33',
-    paddingVertical: height * 0.015,
-    borderRadius: 8,
-    alignItems: 'center',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 3,
-  },
-  startLearningButtonText: {
-    color: 'white',
-    fontSize: 16,
-    fontWeight: 'bold',
-    fontFamily: Platform.select({ ios: 'DM Sans', android: 'sans-serif' }),
-  },
-  testSection: {
-    marginHorizontal: width * 0.04,
-    marginBottom: height * 0.02,
-  },
-  testButton: {
-    backgroundColor: '#FF5722',
-    padding: width * 0.04,
-    borderRadius: 8,
-    alignItems: 'center',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 3,
-  },
-  testButtonText: {
-    color: 'white',
-    fontSize: 14,
-    fontWeight: 'bold',
-    fontFamily: Platform.select({ ios: 'DM Sans', android: 'sans-serif' }),
   },
   modalOverlay: {
     flex: 1,
@@ -589,30 +507,23 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
   },
-  modalContent: {
-    backgroundColor: 'white',
-    borderRadius: 12,
+  modalContentLayout: {
     width: width * 0.9,
     maxHeight: height * 0.8,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.25,
-    shadowRadius: 4,
-    elevation: 5,
   },
   modalHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    padding: width * 0.04,
+    padding: s.cardPadding,
     borderBottomWidth: 1,
-    borderBottomColor: '#e0e0e0',
+    borderBottomColor: c.border,
   },
   modalTitle: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    color: '#333',
-    fontFamily: Platform.select({ ios: 'DM Sans', android: 'sans-serif' }),
+    fontSize: t.fontSize.cardTitle,
+    fontWeight: t.fontWeight.bold,
+    color: c.textMain,
+    fontFamily: t.fontFamily.body,
   },
   modalCloseButton: {
     padding: 4,
@@ -621,43 +532,43 @@ const styles = StyleSheet.create({
     maxHeight: height * 0.6,
   },
   reviewedWordItem: {
-    padding: width * 0.04,
+    padding: s.cardPadding,
     borderBottomWidth: 1,
-    borderBottomColor: '#f0f0f0',
+    borderBottomColor: c.border,
   },
   reviewedWordRow: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    marginBottom: height * 0.01,
+    marginBottom: 8,
   },
   reviewedWordTextContainer: {
     flex: 1,
   },
   reviewedWordText: {
-    fontSize: 16,
-    fontWeight: 'bold',
-    color: '#0C1A30',
-    fontFamily: Platform.select({ ios: 'DM Sans', android: 'sans-serif' }),
+    fontSize: t.fontSize.bodyMeta,
+    fontWeight: t.fontWeight.bold,
+    color: c.primary,
+    fontFamily: t.fontFamily.serif,
   },
   reviewedPhoneticText: {
-    fontSize: 14,
-    color: '#666',
+    fontSize: t.fontSize.bodyMeta,
+    color: c.textMuted,
     fontStyle: 'italic',
-    fontFamily: Platform.select({ ios: 'Inter', android: 'sans-serif' }),
+    fontFamily: t.fontFamily.body,
   },
   reviewedDefinitionText: {
-    fontSize: 14,
-    color: '#333',
+    fontSize: t.fontSize.bodyMeta,
+    color: c.textMain,
     lineHeight: 20,
-    fontFamily: Platform.select({ ios: 'Inter', android: 'sans-serif' }),
+    fontFamily: t.fontFamily.body,
   },
   emptyText: {
-    padding: width * 0.04,
+    padding: s.cardPadding,
     textAlign: 'center',
-    color: '#666',
-    fontSize: 14,
-    fontFamily: Platform.select({ ios: 'Inter', android: 'sans-serif' }),
+    color: c.textMuted,
+    fontSize: t.fontSize.bodyMeta,
+    fontFamily: t.fontFamily.body,
   },
 }); 
 export default WordPreview;

@@ -1,15 +1,23 @@
 import React, { useState } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, Dimensions, Platform, Modal } from 'react-native';
+import {
+  View,
+  Text,
+  StyleSheet,
+  TouchableOpacity,
+  ScrollView,
+  Modal,
+} from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useTheme } from '@hooks/useTheme';
 import { useRouter } from 'expo-router';
 import { useSelector, useDispatch } from 'react-redux';
 import { RootState, AppDispatch } from '@data/repository/store';
-import { Header } from '../components/Header';
 import { logout } from '@data/usecase/UserUseCase';
+import { recipes } from '../../constants/recipes';
+import { designTokensColors as c } from '../../constants/designTokens';
 
-const { width, height } = Dimensions.get('window');
+const profile = recipes.scholarProfile;
 
 export default function ProfilePage() {
   const [showLogoutModal, setShowLogoutModal] = useState(false);
@@ -18,109 +26,145 @@ export default function ProfilePage() {
   const dispatch = useDispatch<AppDispatch>();
   const { user } = useSelector((state: RootState) => state.auth);
 
-  const handleChangeLearningPlan = () => {
-    console.log('[ProfilePage] Change learning plan pressed');
-    router.push('/(settings)/change-wordbook');
+  const displayName = (user?.username ?? `Scholar ${user?.id ?? ''}`.trim()) || 'Scholar';
+  const phoneMask = user?.phone ? `+86 ${user.phone.slice(0, 3)} •••• ${user.phone.slice(-4)}` : '+86 (•••) •••-••••';
+
+  const handleChangeStudyGoal = () => {
+    router.push('/(settings)/change-daily-goal');
   };
 
-  const handleChangePhone = () => {
-    console.log('[ProfilePage] Change phone pressed');
+  const handleUpdateSecurity = () => {
     router.push('/(settings)/change-phone');
   };
 
-  const handleLogoutPress = () => {
-    console.log('[ProfilePage] Logout pressed');
-    setShowLogoutModal(true);
-  };
+  const handleLogoutPress = () => setShowLogoutModal(true);
 
   const handleConfirmLogout = async () => {
-    console.log('[ProfilePage] Confirm logout pressed');
     setShowLogoutModal(false);
     await dispatch(logout());
     router.replace('/(auth)/login');
   };
 
-  const handleCancelLogout = () => {
-    console.log('[ProfilePage] Cancel logout pressed');
-    setShowLogoutModal(false);
-  };
+  const handleCancelLogout = () => setShowLogoutModal(false);
 
   return (
-    <SafeAreaView style={[styles.container, { backgroundColor: '#FC9833' }]}>
-      {/* Header */}
-      <Header 
-        title="仝文馆"
-        showMenuButton={false}
-        showNotificationButton={false}
-        backgroundColor="#FC9833"
-        titleColor="white"
-        iconColor="white"
-      />
-
-      {/* User Profile Section */}
-      <View style={styles.profileSection}>
-        {/* Geometric Background Elements */}
-        <View style={styles.geometricContainer}>
-          <View style={styles.circle1} />
-          <View style={styles.circle2} />
-          <View style={styles.triangle} />
-        </View>
-
-        {/* Avatar */}
-        <View style={styles.avatarContainer}>
-          <View style={styles.avatar}>
-            <Ionicons name="person" size={60} color="white" />
-          </View>
-        </View>
-
-        {/* User ID */}
-        <View style={styles.userInfoContainer}>
-          <Text style={styles.userIdText}>
-            User ID: {user?.id || 'Unknown'}
+    <SafeAreaView
+      style={[profile.screen, { backgroundColor: theme.colors.background }]}
+      edges={['top']}
+    >
+      <ScrollView
+        style={styles.scroll}
+        contentContainerStyle={styles.scrollContent}
+        showsVerticalScrollIndicator={false}
+      >
+        {/* Header: VenTong / 仝文馆 + Scholar's Profile */}
+        <View style={[profile.header, { backgroundColor: theme.colors.background, borderBottomColor: theme.colors.border }]}>
+          <Text style={[profile.headerSubtitle, { color: theme.colors.accent }]}>
+            VenTong / 仝文馆
+          </Text>
+          <Text style={[profile.headerTitle, { color: theme.colors.primary }]}>
+            Scholar's Profile
           </Text>
         </View>
-      </View>
 
-      {/* Function List Section */}
-      <View style={styles.functionSection}>
-        {/* Change Learning Plan Row */}
-        <TouchableOpacity 
-          style={styles.listRow}
-          onPress={handleChangeLearningPlan}
-        >
-          <View style={styles.rowContent}>
-            <Ionicons name="calendar" size={24} color="white" />
-            <Text style={styles.rowText}>更改学习计划</Text>
+        <View style={styles.main}>
+          {/* Profile block: avatar + name + badge */}
+          <View style={profile.profileBlock}>
+            <View style={[profile.avatarOuter, { borderColor: theme.colors.border, backgroundColor: theme.colors.surface }]}>
+              <View style={[profile.avatarInner, { backgroundColor: theme.colors.background }]}>
+                <Ionicons name="person" size={48} color={theme.colors.outline} />
+              </View>
+            </View>
+            <Text style={[profile.displayName, { color: theme.colors.primary }]} numberOfLines={1}>
+              {displayName}
+            </Text>
+            <View style={[profile.roleBadge, { borderColor: theme.colors.accent }]}>
+              <Text style={[profile.roleBadgeText, { color: theme.colors.accent }]}>
+                Senior Scholar
+              </Text>
+            </View>
           </View>
-          <Ionicons name="chevron-forward" size={20} color="rgba(255, 255, 255, 0.7)" />
-        </TouchableOpacity>
 
-        {/* Change Phone Row */}
-        <TouchableOpacity 
-          style={styles.listRow}
-          onPress={handleChangePhone}
-        >
-          <View style={styles.rowContent}>
-            <Ionicons name="phone-portrait" size={24} color="white" />
-            <Text style={styles.rowText}>修改手机号</Text>
+          {/* Lexical Achievement card */}
+          <View style={[profile.achievementCard, { backgroundColor: theme.colors.surface, borderColor: theme.colors.border }]}>
+            <Text style={[profile.achievementCardTitle, { color: theme.colors.onSurfaceVariant }]}>
+              Lexical Achievement
+            </Text>
+            <View style={profile.achievementRow}>
+              <View style={profile.achievementStat}>
+                <Text style={[profile.achievementStatValue, { color: theme.colors.primary }]}>
+                  4,820
+                </Text>
+                <Text style={[profile.achievementStatLabel, { color: theme.colors.onSurfaceVariant }]}>
+                  Words Mastered
+                </Text>
+              </View>
+              <View style={[profile.achievementStatRight, { borderLeftColor: theme.colors.border }]}>
+                <Text style={[profile.achievementStatValue, { color: theme.colors.primary }]}>
+                  128
+                </Text>
+                <Text style={[profile.achievementStatLabel, { color: theme.colors.onSurfaceVariant }]}>
+                  Day Streak
+                </Text>
+              </View>
+            </View>
           </View>
-          <Ionicons name="chevron-forward" size={20} color="rgba(255, 255, 255, 0.7)" />
-        </TouchableOpacity>
 
-        {/* Logout Row */}
-        <TouchableOpacity 
-          style={styles.listRow}
-          onPress={handleLogoutPress}
-        >
-          <View style={styles.rowContent}>
-            <Ionicons name="log-out-outline" size={24} color="white" />
-            <Text style={styles.rowText}>退出登录</Text>
+          {/* Academic Settings */}
+          <Text style={[profile.settingsSectionTitle, { color: theme.colors.onSurfaceVariant }]}>
+            Academic Settings
+          </Text>
+          <TouchableOpacity
+            style={[profile.settingRow, { backgroundColor: theme.colors.surface, borderColor: theme.colors.border }]}
+            onPress={handleChangeStudyGoal}
+            activeOpacity={0.7}
+          >
+            <View style={profile.settingRowLeft}>
+              <Text style={[profile.settingRowLabel, { color: theme.colors.onSurfaceVariant }]}>
+                Change Study Goal
+              </Text>
+              <Text style={[profile.settingRowValue, { color: theme.colors.primary }]}>
+                5 Scholarly Articles
+              </Text>
+            </View>
+            <Ionicons name="chevron-forward" size={20} color={theme.colors.outline} />
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={[profile.settingRow, { backgroundColor: theme.colors.surface, borderColor: theme.colors.border }]}
+            onPress={handleUpdateSecurity}
+            activeOpacity={0.7}
+          >
+            <View style={profile.settingRowLeft}>
+              <Text style={[profile.settingRowLabel, { color: theme.colors.onSurfaceVariant }]}>
+                Update Security
+              </Text>
+              <Text style={[profile.settingRowValue, { color: theme.colors.primary }]} numberOfLines={1}>
+                {phoneMask}
+              </Text>
+            </View>
+            <Ionicons name="chevron-forward" size={20} color={theme.colors.outline} />
+          </TouchableOpacity>
+
+          {/* Log out + version */}
+          <View style={styles.logoutSection}>
+            <TouchableOpacity
+              style={[profile.logoutButton, { borderColor: theme.colors.primary }]}
+              onPress={handleLogoutPress}
+              activeOpacity={0.7}
+            >
+              <Ionicons name="log-out-outline" size={20} color={theme.colors.primary} />
+              <Text style={[profile.logoutButtonText, { color: theme.colors.primary }]}>
+                Log Out / 退出登录
+              </Text>
+            </TouchableOpacity>
+            <Text style={[profile.versionText, { color: theme.colors.onSurfaceVariant }]}>
+              Version 2.4.1 (Academic Edition)
+            </Text>
           </View>
-          <Ionicons name="chevron-forward" size={20} color="rgba(255, 255, 255, 0.7)" />
-        </TouchableOpacity>
-      </View>
+        </View>
+      </ScrollView>
 
-      {/* Logout Confirmation Modal */}
+      {/* Logout confirmation modal */}
       <Modal
         visible={showLogoutModal}
         transparent
@@ -128,20 +172,22 @@ export default function ProfilePage() {
         onRequestClose={handleCancelLogout}
       >
         <View style={styles.modalOverlay}>
-          <View style={styles.modalContent}>
-            <Text style={styles.modalText}>确认退出登录吗？</Text>
+          <View style={[styles.modalContent, { backgroundColor: theme.colors.surface }]}>
+            <Text style={[styles.modalText, { color: theme.colors.onSurfaceVariant }]}>
+              确认退出登录吗？
+            </Text>
             <View style={styles.modalButtons}>
               <TouchableOpacity
-                style={[styles.modalButton, styles.cancelButton]}
+                style={[styles.modalButton, styles.cancelButton, { backgroundColor: c.progressBg }]}
                 onPress={handleCancelLogout}
               >
-                <Text style={styles.cancelButtonText}>否</Text>
+                <Text style={[styles.cancelButtonText, { color: theme.colors.onSurfaceVariant }]}>否</Text>
               </TouchableOpacity>
               <TouchableOpacity
-                style={[styles.modalButton, styles.confirmButton]}
+                style={[styles.modalButton, recipes.button.primaryCta]}
                 onPress={handleConfirmLogout}
               >
-                <Text style={styles.confirmButtonText}>是</Text>
+                <Text style={recipes.button.primaryCtaText}>是</Text>
               </TouchableOpacity>
             </View>
           </View>
@@ -152,130 +198,40 @@ export default function ProfilePage() {
 }
 
 const styles = StyleSheet.create({
-  container: {
+  scroll: {
     flex: 1,
   },
-  profileSection: {
-    alignItems: 'center',
-    paddingTop: height * 0.05,
-    paddingBottom: height * 0.03,
-    position: 'relative',
+  scrollContent: {
+    paddingBottom: 32,
   },
-  geometricContainer: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
-    zIndex: -1,
+  main: {
+    paddingHorizontal: 24,
+    paddingTop: 32,
   },
-  circle1: {
-    position: 'absolute',
-    top: height * 0.02,
-    right: width * 0.1,
-    width: 80,
-    height: 80,
-    borderRadius: 40,
-    backgroundColor: 'rgba(255, 255, 255, 0.1)',
-  },
-  circle2: {
-    position: 'absolute',
-    top: height * 0.08,
-    left: width * 0.05,
-    width: 60,
-    height: 60,
-    borderRadius: 30,
-    backgroundColor: 'rgba(255, 255, 255, 0.08)',
-  },
-  triangle: {
-    position: 'absolute',
-    top: height * 0.15,
-    right: width * 0.05,
-    width: 0,
-    height: 0,
-    backgroundColor: 'transparent',
-    borderStyle: 'solid',
-    borderLeftWidth: 30,
-    borderRightWidth: 30,
-    borderBottomWidth: 52,
-    borderLeftColor: 'transparent',
-    borderRightColor: 'transparent',
-    borderBottomColor: 'rgba(255, 255, 255, 0.06)',
-  },
-  avatarContainer: {
-    marginBottom: height * 0.02,
-  },
-  avatar: {
-    width: 120,
-    height: 120,
-    borderRadius: 60,
-    backgroundColor: 'rgba(255, 255, 255, 0.2)',
-    justifyContent: 'center',
-    alignItems: 'center',
-    borderWidth: 4,
-    borderColor: 'rgba(255, 255, 255, 0.3)',
-  },
-  userInfoContainer: {
-    alignItems: 'center',
-  },
-  userIdText: {
-    color: 'white',
-    fontSize: 18,
-    fontFamily: Platform.select({ ios: 'DM Sans', android: 'sans-serif' }),
-    fontWeight: '600',
-  },
-  functionSection: {
-    flex: 1,
-    paddingHorizontal: width * 0.04,
-    paddingTop: height * 0.02,
-  },
-  listRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingVertical: height * 0.02,
-    paddingHorizontal: width * 0.04,
-  },
-  rowContent: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    flex: 1,
-  },
-  rowText: {
-    fontSize: 16,
-    fontWeight: '500',
-    color: 'white',
-    marginLeft: width * 0.03,
-    fontFamily: Platform.select({ ios: 'DM Sans', android: 'sans-serif' }),
-  },
-  divider: {
-    height: 1,
-    backgroundColor: 'rgba(255, 255, 255, 0.2)',
-    marginHorizontal: width * 0.04,
+  logoutSection: {
+    marginTop: 48,
+    paddingHorizontal: 8,
   },
   modalOverlay: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    backgroundColor: 'rgba(0, 0, 0, 0.3)',
+    backgroundColor: 'rgba(0,0,0,0.3)',
   },
   modalContent: {
-    backgroundColor: '#fff',
     borderRadius: 16,
     padding: 32,
     alignItems: 'center',
+    minWidth: 280,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.18,
     shadowRadius: 8,
     elevation: 8,
-    minWidth: 280,
-    minHeight: 120,
   },
   modalText: {
     fontSize: 16,
     fontWeight: '500',
-    color: '#666',
     textAlign: 'center',
     marginBottom: 24,
   },
@@ -292,20 +248,9 @@ const styles = StyleSheet.create({
     paddingHorizontal: 24,
     alignItems: 'center',
   },
-  cancelButton: {
-    backgroundColor: '#f0f0f0',
-  },
-  confirmButton: {
-    backgroundColor: '#FC9B33',
-  },
+  cancelButton: {},
   cancelButtonText: {
-    color: '#666',
     fontSize: 16,
-    fontWeight: 'bold',
-  },
-  confirmButtonText: {
-    color: '#fff',
-    fontSize: 16,
-    fontWeight: 'bold',
+    fontWeight: '700',
   },
 });

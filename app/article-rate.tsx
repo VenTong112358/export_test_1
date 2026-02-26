@@ -1,59 +1,82 @@
 import React, { useState } from 'react';
-import { View, Text, TouchableOpacity, StyleSheet, Dimensions, Alert, ActivityIndicator, Modal } from 'react-native';
+import {
+  View,
+  Text,
+  TouchableOpacity,
+  StyleSheet,
+  Alert,
+  ActivityIndicator,
+  Modal,
+  SafeAreaView,
+  Platform,
+} from 'react-native';
 import { useRouter, useLocalSearchParams } from 'expo-router';
-import { Header } from './components/Header';
-import { DigitRating } from './components/DigitRating';
-
-const { width, height } = Dimensions.get('window');
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { Ionicons } from '@expo/vector-icons';
+import { recipes } from '../constants/recipes';
+import { StarRating } from './components/StarRating';
 
 const FEEDBACK_ENDPOINT = 'https://masterwordai.com/api/learning_logs_feedback';
 const APPRECIATION_ENDPOINT = 'https://masterwordai.com/api/appreciation';
+
+const DIMENSIONS = [
+  { key: 'lexical', title: '1. 文章质量' },
+  { key: 'content', title: '2. 文章难度' },
+  { key: 'grammatical', title: '3. 单词难度' },
+  { key: 'engagement', title: '4. Overall Engagement' },
+] as const;
 
 const ArticleRateNew = () => {
   const router = useRouter();
   const params = useLocalSearchParams();
   const logId = params.logId as string;
 
-  const [articleQuality, setArticleQuality] = useState(0);
-  const [articleDifficulty, setArticleDifficulty] = useState(0);
-  const [wordDifficulty, setWordDifficulty] = useState(0);
+  const [lexical, setLexical] = useState(0);
+  const [contentDepth, setContentDepth] = useState(0);
+  const [grammatical, setGrammatical] = useState(0);
+  const [engagement, setEngagement] = useState(0);
   const [loading, setLoading] = useState(false);
   const [showSuccessModal, setShowSuccessModal] = useState(false);
 
-  const canSubmit = articleQuality > 0 && articleDifficulty > 0 && wordDifficulty > 0 && !loading;
+  const canSubmit =
+    lexical > 0 && contentDepth > 0 && grammatical > 0 && engagement > 0 && !loading;
+
+  const handleSkip = () => {
+    router.push(`/today-recap?logId=${logId}`);
+  };
 
   const handleSubmit = async () => {
     if (!canSubmit) return;
     setLoading(true);
     try {
+      const articleQuality = engagement;
+      const articleDifficulty = Math.round((contentDepth + grammatical) / 2);
+      const wordDifficulty = lexical;
+
       console.log('[ArticleRate] Submitting feedback:', {
         logId,
         article_quality: articleQuality,
         article_difficulty: articleDifficulty,
         word_difficulty: wordDifficulty,
       });
-      
-      // Submit article quality feedback
-      const appreciationRes = await fetch(`${APPRECIATION_ENDPOINT}/${logId}/${articleQuality}`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-      });
-      
-      console.log('[ArticleRate] Appreciation response status:', appreciationRes.status);
-      
+
+      const appreciationRes = await fetch(
+        `${APPRECIATION_ENDPOINT}/${logId}/${articleQuality}`,
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+        }
+      );
+
       if (!appreciationRes.ok) {
         if (appreciationRes.status === 404) {
-          console.error('[ArticleRate] Appreciation failed: Log not found');
           Alert.alert('反馈失败', '未找到对应学习记录');
           return;
-        } else {
-          console.error('[ArticleRate] Appreciation failed with status:', appreciationRes.status);
-          Alert.alert('反馈失败', '请稍后重试');
-          return;
         }
+        Alert.alert('反馈失败', '请稍后重试');
+        return;
       }
-      
-      // Submit difficulty feedback
+
       const feedbackRes = await fetch(`${FEEDBACK_ENDPOINT}/${logId}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
@@ -62,20 +85,12 @@ const ArticleRateNew = () => {
           word_difficulty: wordDifficulty,
         }),
       });
-      
-      console.log('[ArticleRate] Feedback response status:', feedbackRes.status);
-      
+
       if (feedbackRes.ok) {
-        const responseData = await feedbackRes.json();
-        console.log('[ArticleRate] Feedback submitted successfully:', responseData);
-        
-        // 显示成功弹窗
         setShowSuccessModal(true);
       } else if (feedbackRes.status === 404) {
-        console.error('[ArticleRate] Feedback failed: Log not found');
         Alert.alert('反馈失败', '未找到对应学习记录');
       } else {
-        console.error('[ArticleRate] Feedback failed with status:', feedbackRes.status);
         Alert.alert('反馈失败', '请稍后重试');
       }
     } catch (e) {
@@ -86,217 +101,130 @@ const ArticleRateNew = () => {
     }
   };
 
+  const ev = recipes.articleEvaluation;
+  const insets = useSafeAreaInsets();
+
   return (
-    <View style={{ flex: 1, backgroundColor: '#FFFBF8' }}>
-      <Header 
-        title="文章反馈" 
-        showBackButton 
-        customRightComponent={
-          <TouchableOpacity 
-            onPress={() => router.push(`/today-recap?logId=${logId}`)}
+    <SafeAreaView style={[ev.screenBg, styles.safe]}>
+      <View style={[ev.header, { paddingTop: insets.top, height: undefined, minHeight: 56 + insets.top }]}>
+        <View style={ev.headerLeft}>
+          <TouchableOpacity
+            onPress={() => router.back()}
+            style={styles.backBtn}
+            hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
           >
-            <Text style={{ color: '#FC9B33', fontSize: 16, fontWeight: '600' }}>跳过</Text>
+            <Ionicons
+              name={Platform.OS === 'ios' ? 'chevron-back' : 'arrow-back'}
+              size={22}
+              color={ev.headerBrand.color}
+            />
           </TouchableOpacity>
-        }
-      />
-      <View style={{ flex: 1, alignItems: 'center', paddingTop: 48, paddingHorizontal: 24 }}>
-        {/* 文章质量评分 */}
-        <Text style={{ fontSize: 18, fontWeight: 'bold', color: '#FC9B33', marginBottom: 12, alignSelf: 'flex-start', alignItems: 'center' }}>您觉得文章质量如何</Text>
-        <DigitRating value={articleQuality} onChange={setArticleQuality} />
-        {/* 文章难度评分 */}
-        <Text style={{ fontSize: 18, fontWeight: 'bold', color: '#FC9B33', marginBottom: 12, marginTop: 32, alignSelf: 'flex-start', alignItems: 'center' }}>您觉得文章难度如何</Text>
-        <DigitRating value={articleDifficulty} onChange={setArticleDifficulty} />
-        {/* 单词难度评分 */}
-        <Text style={{ fontSize: 18, fontWeight: 'bold', color: '#FC9B33', marginBottom: 12, marginTop: 32, alignSelf: 'flex-start' }}>您觉得单词难度如何</Text>
-        <DigitRating value={wordDifficulty} onChange={setWordDifficulty} />
-        {/* 提交按钮 */}
+          <Text style={ev.headerBrand}>VENTONG</Text>
+        </View>
+        <TouchableOpacity onPress={handleSkip} style={styles.skipBtn}>
+          <Text style={ev.headerSkip}>Skip / 跳过</Text>
+        </TouchableOpacity>
+      </View>
+
+      <View style={ev.main}>
+        <Text style={ev.pageTitle}>ARTICLE EVALUATION</Text>
+        <Text style={ev.subtitle}>
+          Please rate the quality of the scholarly text across four dimensions:
+        </Text>
+
+        <View style={styles.dimensions}>
+          <View style={ev.dimensionBlock}>
+            <Text style={ev.dimensionTitle}>{DIMENSIONS[0].title}</Text>
+            <StarRating value={lexical} onChange={setLexical} />
+          </View>
+          <View style={ev.dimensionBlock}>
+            <Text style={ev.dimensionTitle}>{DIMENSIONS[1].title}</Text>
+            <StarRating value={contentDepth} onChange={setContentDepth} />
+          </View>
+          <View style={ev.dimensionBlock}>
+            <Text style={ev.dimensionTitle}>{DIMENSIONS[2].title}</Text>
+            <StarRating value={grammatical} onChange={setGrammatical} />
+          </View>
+          <View style={ev.dimensionBlock}>
+            <Text style={ev.dimensionTitle}>{DIMENSIONS[3].title}</Text>
+            <StarRating value={engagement} onChange={setEngagement} />
+          </View>
+        </View>
+      </View>
+
+      <View style={ev.footer}>
         <TouchableOpacity
-          style={{ marginTop: 48, backgroundColor: canSubmit ? '#FC9B33' : '#eee', borderRadius: 24, paddingVertical: 14, paddingHorizontal: 48, alignItems: 'center', alignSelf: 'center', minWidth: 180 }}
+          style={[
+            ev.submitButton,
+            !canSubmit && styles.submitDisabled,
+          ]}
           onPress={handleSubmit}
           disabled={!canSubmit}
+          activeOpacity={0.85}
         >
           {loading ? (
-            <ActivityIndicator color="#fff" />
+            <ActivityIndicator color="#fff" size="small" />
           ) : (
-            <Text style={{ color: '#fff', fontSize: 16, fontWeight: 'bold' }}>提交反馈</Text>
+            <>
+              <Text style={ev.submitButtonText}>
+                SUBMIT EVALUATION / 提交评价
+              </Text>
+              <Ionicons name="checkmark" size={18} color="#fff" />
+            </>
           )}
         </TouchableOpacity>
       </View>
-      
-      {/* 成功弹窗 */}
+
       <Modal
         visible={showSuccessModal}
         transparent
         animationType="fade"
         onRequestClose={() => setShowSuccessModal(false)}
       >
-        <View style={styles.modalOverlay}>
-          <View style={styles.modalContent}>
-            <Text style={styles.modalText}>谢谢，鼠鼠们收到啦！</Text>
+        <View style={ev.modalOverlay}>
+          <View style={ev.modalContent}>
+            <Text style={ev.modalMessage}>谢谢，鼠鼠们收到啦！</Text>
             <TouchableOpacity
-              style={{
-                backgroundColor: '#FC9B33',
-                borderRadius: 20,
-                paddingVertical: 10,
-                paddingHorizontal: 24,
-                marginTop: 16,
-              }}
+              style={[recipes.button.primaryCta, styles.modalCta]}
               onPress={() => {
                 setShowSuccessModal(false);
                 router.push(`/today-recap?logId=${logId}`);
               }}
             >
-              <Text style={{ color: '#fff', fontSize: 16, fontWeight: 'bold' }}>确定</Text>
+              <Text style={recipes.button.primaryCtaText}>确定</Text>
             </TouchableOpacity>
           </View>
         </View>
       </Modal>
-    </View>
+    </SafeAreaView>
   );
 };
 
-// =================== 旧实现全部注释掉 ===================
-/*
-//   return (
-//     <View style={styles.container}>
-/*       Header 
-        <View style={styles.header}>
-          <TouchableOpacity style={styles.menuButton} onPress={handleBackPress}>
-            <Ionicons name="arrow-back" size={24} color="#0C1A30" />
-          </TouchableOpacity>
-          <View style={styles.headerTitleWrapper}>
-            <Text style={styles.headerTitle}>Article Rate</Text>
-          </View>
-          <View style={{ width: 32 }} /> 
-        </View>
-        Main Content 
-        <View style={styles.content}>
-          <View style={styles.titleContainer}>
-            <Text style={styles.titleText}>你觉得文章难度怎么样</Text>
-          </View>
-          <View style={styles.buttonsContainer}>
-            {feedbackOptions.map(option => (
-              <TouchableOpacity
-                key={option.value}
-                style={styles.button}
-                onPress={() => handleFeedback(option.value)}
-                activeOpacity={0.7}
-              >
-                <Text style={styles.buttonText}>{option.label}</Text>
-              </TouchableOpacity>
-            ))}
-          </View>
-        </View>
-      </View>
-//   );
-// }
-*/
-// =================== 新实现将在下方添加 ===================
-
-export default ArticleRateNew;
 const styles = StyleSheet.create({
-  container: {
+  safe: {
     flex: 1,
   },
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: width * 0.04,
-    paddingVertical: height * 0.015,
-    backgroundColor: '#FFFBF8',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.05,
-    shadowRadius: 3,
-    elevation: 2,
-  },
-  headerTitleWrapper: {
-    flex: 1,
+  backBtn: {
+    width: 32,
+    height: 32,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  headerTitle: {
-    color: '#FC9B33',
-    fontSize: 18,
-    fontWeight: '700',
-    textAlign: 'center',
-  },
-  menuButton: {
+  skipBtn: {
     padding: 8,
   },
-  notificationButton: {
-    padding: 8,
-  },
-  content: {
-    alignItems: 'flex-start',
-    justifyContent: 'flex-start',
-    paddingHorizontal: 18,
-    paddingTop: 32,
+  dimensions: {
     width: '100%',
+    maxWidth: 400,
   },
-  titleContainer: {
-    backgroundColor: '#FC9B33',
-    borderRadius: 24,
-    paddingHorizontal: 22,
-    paddingVertical: 8,
-    marginBottom: 22,
-    alignSelf: 'flex-start',
+  submitDisabled: {
+    opacity: 0.5,
   },
-  titleText: {
-    color: '#fff',
-    fontSize: 16,
-    fontWeight: 'bold',
-    textAlign: 'left',
-    letterSpacing: 0.5,
-  },
-  buttonsContainer: {
-    width: '100%',
-    alignItems: 'flex-end',
-    gap: 12,
-    justifyContent: 'flex-end',
-  },
-  button: {
-    borderColor: '#FC9B33',
-    borderWidth: 1.2,
-    borderRadius: 22,
-    paddingVertical: 8,
-    paddingHorizontal: 18,
-    marginBottom: 10,
-    minWidth: 180,
-    alignItems: 'center',
-    backgroundColor: '#fff',
-    alignSelf: 'flex-end',
-  },
-  buttonText: {
-    color: '#FC9B33',
-    fontSize: 15,
-    fontWeight: '400',
-    textAlign: 'center',
-  },
-  modalOverlay: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    backgroundColor: 'rgba(0, 0, 0, 0.3)',
-  },
-  modalContent: {
-    backgroundColor: '#fff',
-    borderRadius: 16,
-    padding: 32,
-    alignItems: 'center',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.18,
-    shadowRadius: 8,
-    elevation: 8,
-    minWidth: 280,
-    minHeight: 120,
-  },
-  modalText: {
-    fontSize: 16,
-    fontWeight: '500',
-    color: '#666',
-    textAlign: 'center',
+  modalCta: {
+    marginTop: 16,
+    paddingVertical: 10,
+    paddingHorizontal: 24,
   },
 });
+
+export default ArticleRateNew;

@@ -4,16 +4,44 @@ import { SmsApi } from '@data/api/SmsApi';
 import { AppDispatch } from '@data/repository/store';
 import { clearDailyLearningLogsCache, fetchDailyLearningLogs, resetLogs } from '@data/usecase/DailyLearningLogsUseCase';
 import { loginWithWeChat, setUser, STORAGE_KEYS } from '@data/usecase/UserUseCase';
+import { Ionicons } from '@expo/vector-icons';
 import { usePrivacyPolicyAgreement } from '@hooks/usePrivacyPolicyAgreement';
 import { useTheme } from '@hooks/useTheme';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useRouter } from 'expo-router';
 import { useEffect, useState } from 'react';
-import { Alert, BackHandler, Dimensions, Linking, Platform, ScrollView, StyleSheet, TouchableOpacity, View } from 'react-native';
-import { Button, Checkbox, Text, TextInput } from 'react-native-paper';
+import {
+  Alert,
+  BackHandler,
+  Linking,
+  Platform,
+  TextInput as RNTextInput,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View,
+} from 'react-native';
+import { Checkbox } from 'react-native-paper';
 import { useDispatch } from 'react-redux';
+import {
+  designTokensColors as c,
+  typography as t
+} from '../../constants/designTokens';
+import { recipes } from '../../constants/recipes';
 
-const { width, height } = Dimensions.get('window');
+// Layout: body px-8 py-10, header mt-8, main my-8 max-w-sm, form space-y-6, footer mt-4 pb-8
+const PX_8 = 32;
+const PY_10 = 40;
+const MT_8 = 32;
+const MY_8 = 32;
+const SPACE_Y_6 = 24;
+const PT_4 = 16;
+const SPACE_Y_4 = 16;
+const MT_4 = 16;
+const PB_8 = 32;
+const PT_8 = 32;
+const MAX_W_SM = 384;
 
 export default function RegisterScreen() {
   const [phoneNumber, setPhoneNumber] = useState('');
@@ -27,14 +55,17 @@ export default function RegisterScreen() {
   const [smsLoading, setSmsLoading] = useState(false);
   const [wechatLoading, setWechatLoading] = useState(false);
   const [showPrivacyModal, setShowPrivacyModal] = useState(false);
-  
+  const [usernameFocused, setUsernameFocused] = useState(false);
+  const [phoneFocused, setPhoneFocused] = useState(false);
+  const [passwordFocused, setPasswordFocused] = useState(false);
+  const [verifyPasswordFocused, setVerifyPasswordFocused] = useState(false);
+
   const dispatch = useDispatch<AppDispatch>();
   const { theme } = useTheme();
   const router = useRouter();
   const smsApi = SmsApi.getInstance();
   const { hasAccepted: privacyPolicyAccepted, isLoading: privacyPolicyLoading, acceptPrivacyPolicy } = usePrivacyPolicyAgreement();
 
-  // Show privacy policy modal on first app use
   useEffect(() => {
     if (!privacyPolicyLoading && privacyPolicyAccepted === false) {
       setShowPrivacyModal(true);
@@ -62,7 +93,6 @@ export default function RegisterScreen() {
   };
 
   const handleDeclinePrivacyPolicy = () => {
-    // User declined - exit the app
     console.log('[Register] User declined privacy policy, exiting app');
     BackHandler.exitApp();
   };
@@ -189,142 +219,201 @@ export default function RegisterScreen() {
 
   return (
     <>
-      <PrivacyPolicyModal 
-        visible={showPrivacyModal} 
+      <PrivacyPolicyModal
+        visible={showPrivacyModal}
         onAccept={handleAcceptPrivacyPolicy}
         onDecline={handleDeclinePrivacyPolicy}
       />
-      <ScrollView contentContainerStyle={[styles.container, { backgroundColor: theme.colors.background }]}> 
-        <View style={styles.content}>
-        {/* Title Section */}
-        <View style={styles.titleSection}>
-          <Text style={styles.title}>注册</Text>
-          <Text style={styles.subtitle}>欢迎加入仝文馆！请填写信息完成注册。</Text>
+      <ScrollView
+        contentContainerStyle={[styles.container, { backgroundColor: theme.colors.background }]}
+        keyboardShouldPersistTaps="handled"
+      >
+        {/* Header: slogan + title 仝文馆 */}
+        <View style={styles.header}>
+          <Text style={recipes.auth.subtitle}>VenTong —— 沉浸语境，词自成章</Text>
+          <Text style={[recipes.auth.title, styles.headerTitleChinese]}>仝文馆</Text>
+          <View style={recipes.auth.divider} />
         </View>
-        {formError ? (
-          <Text style={styles.error}>{formError}</Text>
-        ) : null}
-        {/* Username Input */}
-        <View style={styles.inputSection}>
-          <View style={styles.inputLabel}>
-            <Text style={styles.labelText}>UserName</Text>
-            <Text style={styles.labelText}>用户名</Text>
+
+        {/* Main: form */}
+        <View style={styles.main}>
+          <View style={styles.centeredBlock}>
+            {formError ? <Text style={styles.error}>{formError}</Text> : null}
+
+            {/* 用户名 */}
+            <View style={styles.inputSection}>
+              <Text style={recipes.form.inputLabel}>用户名</Text>
+              <View
+                style={[
+                  styles.inputUnderlineWrap,
+                  { borderBottomColor: usernameFocused ? c.primary : c.border },
+                ]}
+              >
+                <RNTextInput
+                  value={username}
+                  onChangeText={setUsername}
+                  onFocus={() => setUsernameFocused(true)}
+                  onBlur={() => setUsernameFocused(false)}
+                  style={styles.inputText}
+                  placeholder="请输入用户名"
+                  placeholderTextColor={c.placeholder}
+                  autoCapitalize="none"
+                  autoCorrect={false}
+                />
+              </View>
+            </View>
+
+            {/* 手机号 */}
+            <View style={styles.inputSection}>
+              <Text style={recipes.form.inputLabel}>手机号</Text>
+              <View
+                style={[
+                  styles.inputUnderlineWrap,
+                  { borderBottomColor: phoneFocused ? c.primary : c.border },
+                ]}
+              >
+                <RNTextInput
+                  value={phoneNumber}
+                  onChangeText={setPhoneNumber}
+                  onFocus={() => setPhoneFocused(true)}
+                  onBlur={() => setPhoneFocused(false)}
+                  style={styles.inputText}
+                  placeholder="+86 1XX XXXX XXXX"
+                  placeholderTextColor={c.placeholder}
+                  keyboardType="phone-pad"
+                  maxLength={11}
+                />
+              </View>
+            </View>
+
+            {/* 密码 */}
+            <View style={styles.inputSection}>
+              <Text style={recipes.form.inputLabel}>密码</Text>
+              <View
+                style={[
+                  styles.inputUnderlineWrap,
+                  { borderBottomColor: passwordFocused ? c.primary : c.border },
+                ]}
+              >
+                <RNTextInput
+                  value={password}
+                  onChangeText={setPassword}
+                  onFocus={() => setPasswordFocused(true)}
+                  onBlur={() => setPasswordFocused(false)}
+                  style={styles.inputText}
+                  placeholder="••••••••"
+                  placeholderTextColor={c.placeholder}
+                  secureTextEntry={!showPassword}
+                />
+                <TouchableOpacity
+                  hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                  onPress={() => setShowPassword((v) => !v)}
+                  style={styles.passwordToggle}
+                >
+                  <Ionicons
+                    name={showPassword ? 'eye-off-outline' : 'eye-outline'}
+                    size={22}
+                    color={c.accent}
+                  />
+                </TouchableOpacity>
+              </View>
+            </View>
+
+            {/* 确认密码 */}
+            <View style={styles.inputSection}>
+              <Text style={recipes.form.inputLabel}>确认密码</Text>
+              <View
+                style={[
+                  styles.inputUnderlineWrap,
+                  { borderBottomColor: verifyPasswordFocused ? c.primary : c.border },
+                ]}
+              >
+                <RNTextInput
+                  value={verifyPassword}
+                  onChangeText={setVerifyPassword}
+                  onFocus={() => setVerifyPasswordFocused(true)}
+                  onBlur={() => setVerifyPasswordFocused(false)}
+                  style={styles.inputText}
+                  placeholder="••••••••"
+                  placeholderTextColor={c.placeholder}
+                  secureTextEntry={!showVerifyPassword}
+                />
+                <TouchableOpacity
+                  hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                  onPress={() => setShowVerifyPassword((v) => !v)}
+                  style={styles.passwordToggle}
+                >
+                  <Ionicons
+                    name={showVerifyPassword ? 'eye-off-outline' : 'eye-outline'}
+                    size={22}
+                    color={c.accent}
+                  />
+                </TouchableOpacity>
+              </View>
+            </View>
+
+            {/* 同意隐私政策 */}
+            <View style={recipes.form.checkboxRow}>
+              <Checkbox
+                status={acceptedTerms ? 'checked' : 'unchecked'}
+                onPress={() => setAcceptedTerms(!acceptedTerms)}
+                color={c.primary}
+              />
+              <View style={styles.checkboxLabelWrap}>
+                <Text style={recipes.form.checkboxLabel}>我已阅读并同意 </Text>
+                <TouchableOpacity
+                  onPress={() => Linking.openURL('https://masterwordai.com/%E5%85%B3%E4%BA%8E%E5%85%AC%E5%8F%B8-2')}
+                >
+                  <Text style={recipes.form.checkboxLink}>《隐私政策》</Text>
+                </TouchableOpacity>
+              </View>
+            </View>
+
+            {/* 发送验证码 */}
+            <View style={styles.primaryButtonWrap}>
+              <TouchableOpacity
+                style={recipes.button.primaryCtaLarge}
+                onPress={handleSmsRegister}
+                disabled={smsLoading || wechatLoading}
+                activeOpacity={0.9}
+              >
+                <Text style={recipes.button.primaryCtaLargeText}>
+                  {smsLoading ? '…' : '发送验证码'}
+                </Text>
+              </TouchableOpacity>
+            </View>
+
+            {/* or */}
+            <View style={[recipes.form.dividerRow, styles.dividerWrap]}>
+              <View style={recipes.form.dividerLine} />
+              <Text style={recipes.form.dividerText}>or</Text>
+              <View style={recipes.form.dividerLine} />
+            </View>
+
+            {/* 微信注册 */}
+            <TouchableOpacity
+              style={recipes.button.wechatOutline}
+              onPress={handleWeChatRegister}
+              disabled={smsLoading || wechatLoading}
+              activeOpacity={0.9}
+            >
+              <Text style={recipes.button.wechatOutlineText}>
+                {wechatLoading ? '…' : '微信注册'}
+              </Text>
+            </TouchableOpacity>
           </View>
-          <TextInput
-            value={username}
-            onChangeText={setUsername}
-            mode="outlined"
-            style={styles.input}
-            contentStyle={[styles.inputContent, { fontSize: 14 }]}
-            outlineStyle={styles.inputOutline}
-            autoCapitalize="none"
-            placeholder="请输入用户名"
-            placeholderTextColor="#B0B0B0"
-          />
         </View>
-        {/* Password Input */}
-        <View style={styles.inputSection}>
-          <View style={styles.inputLabel}>
-            <Text style={styles.labelText}>Password</Text>
-            <Text style={styles.labelText}>密码</Text>
-          </View>
-          <TextInput
-            value={password}
-            onChangeText={setPassword}
-            mode="outlined"
-            style={styles.input}
-            contentStyle={[styles.inputContent, { fontSize: 14 }]}
-            outlineStyle={styles.inputOutline}
-            secureTextEntry={!showPassword}
-            placeholder="请输入密码，至少8位，包含字母和数字"
-            placeholderTextColor="#B0B0B0"
-            right={<TextInput.Icon icon={showPassword ? 'eye-off' : 'eye'} onPress={() => setShowPassword(v => !v)} />}
-          />
-        </View>
-        {/* Verify Password Input */}
-        <View style={styles.inputSection}>
-          <View style={styles.inputLabel}>
-            <Text style={styles.labelText}>Confirt Password</Text>
-            <Text style={styles.labelText}>确认密码</Text>
-          </View>
-          <TextInput
-            value={verifyPassword}
-            onChangeText={setVerifyPassword}
-            mode="outlined"
-            style={styles.input}
-            contentStyle={[styles.inputContent, { fontSize: 14 }]}
-            outlineStyle={styles.inputOutline}
-            secureTextEntry={!showVerifyPassword}
-            placeholder="请再次输入密码"
-            placeholderTextColor="#B0B0B0"
-            right={<TextInput.Icon icon={showVerifyPassword ? 'eye-off' : 'eye'} onPress={() => setShowVerifyPassword(v => !v)} />}
-          />
-        </View>
-        {/* Phone Number Input */}
-        <View style={styles.inputSection}>
-          <View style={styles.inputLabel}>
-            <Text style={styles.labelText}>PhoneNumber</Text>
-            <Text style={styles.labelText}>手机号</Text>
-          </View>
-          <TextInput
-            value={phoneNumber}
-            onChangeText={setPhoneNumber}
-            mode="outlined"
-            style={styles.input}
-            contentStyle={[styles.inputContent, { fontSize: 14 }]}
-            outlineStyle={styles.inputOutline}
-            keyboardType="phone-pad"
-            maxLength={11}
-            placeholder="请输入手机号"
-            placeholderTextColor="#B0B0B0"
-          />
-        </View>
-        {/* Terms and Privacy Policy */}
-        <View style={styles.termsContainer}>
-          <Checkbox
-            status={acceptedTerms ? 'checked' : 'unchecked'}
-            onPress={() => setAcceptedTerms(!acceptedTerms)}
-          />
-          <TouchableOpacity onPress={() => Linking.openURL('https://masterwordai.com/%E5%85%B3%E4%BA%8E%E5%85%AC%E5%8F%B8-2')}>
-            <Text style={styles.termsText}>我已阅读并同意隐私政策</Text>
+
+        {/* Footer */}
+        <View style={styles.footer}>
+          <TouchableOpacity onPress={() => router.replace('/(auth)/login')}>
+            <Text style={recipes.link.footerHighlight}>已有账号？去登录</Text>
           </TouchableOpacity>
+          <View style={styles.footerMutedWrap}>
+            <Text style={recipes.link.footerMuted}>Est. MMXXIV</Text>
+          </View>
         </View>
-        {/* Register Button */}
-        <Button
-          mode="contained"
-          onPress={handleSmsRegister}
-          style={styles.registerButton}
-          contentStyle={styles.registerButtonContent}
-          labelStyle={styles.registerButtonLabel}
-          loading={smsLoading}
-          disabled={smsLoading}
-        >
-          发送验证码
-        </Button>
-        {/* WeChat Register Button */}
-        <Button
-          mode="contained"
-          icon="wechat"
-          onPress={handleWeChatRegister}
-          style={styles.wechatButton}
-          contentStyle={styles.registerButtonContent}
-          labelStyle={styles.registerButtonLabel}
-          loading={wechatLoading}
-          disabled={smsLoading || wechatLoading}
-        >
-          微信注册
-        </Button>
-        {/* Go to Login Button */}
-        <Button
-          mode="text"
-          onPress={() => router.replace('/(auth)/login')}
-          style={styles.button}
-          labelStyle={{ color: '#838589' }}
-        >
-          已有账号？去登录
-        </Button>
-      </View>
-    </ScrollView>
+      </ScrollView>
     </>
   );
 }
@@ -332,99 +421,78 @@ export default function RegisterScreen() {
 const styles = StyleSheet.create({
   container: {
     flexGrow: 1,
+    justifyContent: 'space-between',
+    paddingHorizontal: PX_8,
+    paddingTop: PY_10,
+    paddingBottom: PB_8,
+  },
+  main: {
+    flex: 1,
     justifyContent: 'center',
-    backgroundColor: '#FFFBF8',
+    width: '100%',
+    maxWidth: MAX_W_SM,
+    alignSelf: 'center',
+    marginVertical: MY_8,
   },
-  content: {
-    paddingHorizontal: width * 0.12,
+  centeredBlock: {
+    width: '100%',
   },
-  titleSection: {
-    marginBottom: height * 0.04,
+  header: {
+    alignItems: 'center',
+    marginTop: MT_8,
   },
-  title: {
-    fontSize: 32,
-    fontFamily: Platform.select({ ios: 'DM Sans', android: 'sans-serif' }),
-    color: '#0C1A30',
-    fontWeight: 'bold',
-    marginBottom: height * 0.01,
-  },
-  subtitle: {
-    fontSize: 14,
-    fontFamily: Platform.select({ ios: 'Inter', android: 'sans-serif' }),
-    color: '#838589',
+  /** 仝文馆：使用中文字体完整显示，避免被截断 */
+  headerTitleChinese: {
+    fontFamily: t.fontFamily.serifChinese,
+    fontStyle: 'normal',
   },
   inputSection: {
-    marginBottom: height * 0.03,
+    marginBottom: SPACE_Y_6,
   },
-  inputLabel: {
+  inputUnderlineWrap: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: height * 0.01,
+    borderBottomWidth: 1,
+    paddingVertical: 8,
   },
-  labelText: {
-    fontSize: 12,
-    fontFamily: Platform.select({ ios: 'Inter', android: 'sans-serif' }),
-    color: '#838589',
-  },
-  input: {
-    backgroundColor: '#EDEDED',
-    borderRadius: 12,
-  },
-  inputContent: {
-    paddingVertical: height * 0.015,
-    paddingHorizontal: width * 0.04,
-  },
-  inputOutline: {
-    borderWidth: 0,
-  },
-  registerButton: {
-    backgroundColor: '#FC9B33',
-    borderRadius: 12,
-    marginTop: height * 0.02,
-    marginBottom: height * 0.03,
-    shadowColor: '#FC9B33',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.3,
-    shadowRadius: 8,
-    elevation: 5,
-  },
-  registerButtonContent: {
-    paddingVertical: height * 0.013,
-    paddingHorizontal: width * 0.04,
-  },
-  registerButtonLabel: {
-    color: 'white',
+  inputText: {
+    flex: 1,
     fontSize: 18,
-    fontFamily: Platform.select({ ios: 'DM Sans', android: 'sans-serif' }),
-    fontWeight: '700',
+    fontFamily: t.fontFamily.serif,
+    color: c.primary,
+    padding: 0,
+    margin: 0,
+    minHeight: 28,
   },
-  wechatButton: {
-    backgroundColor: '#07C160',
-    borderRadius: 12,
-    marginBottom: height * 0.03,
-    shadowColor: '#07C160',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.3,
-    shadowRadius: 8,
-    elevation: 5,
+  passwordToggle: {
+    paddingHorizontal: 4,
+    paddingVertical: 4,
   },
-  button: {
-    marginTop: 8,
+  checkboxLabelWrap: {
+    flex: 1,
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    alignItems: 'center',
+  },
+  primaryButtonWrap: {
+    marginTop: PT_4,
+    marginBottom: SPACE_Y_4,
+  },
+  dividerWrap: {
+    marginBottom: SPACE_Y_4,
   },
   error: {
-    color: 'red',
-    marginBottom: 16,
+    color: c.primary,
+    fontSize: t.fontSize.bodyMeta,
+    marginBottom: SPACE_Y_4,
     textAlign: 'center',
   },
-  termsContainer: {
-    flexDirection: 'row',
+  footer: {
+    marginTop: MT_4,
     alignItems: 'center',
-    marginBottom: 16,
   },
-  termsText: {
-    marginLeft: 8,
-    color: '#0066CC',
-    textDecorationLine: 'underline',
+  footerMutedWrap: {
+    marginTop: PT_8,
+    paddingTop: PT_8,
   },
 });

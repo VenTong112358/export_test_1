@@ -7,6 +7,8 @@ import { Ionicons } from '@expo/vector-icons';
 import { useEffect, useState } from 'react';
 import { useAuth } from '@hooks/useAuth';
 import { View, ActivityIndicator } from 'react-native';
+import { designTokensColors as c } from '../../constants/designTokens';
+import { spacing as s, typography as t } from '../../constants/designTokens';
 
 function TabBarIcon(props: {// OK了就是复用定义icon的组件
   name: React.ComponentProps<typeof Ionicons>['name'];
@@ -40,8 +42,8 @@ export default function TabsLayout() {
   // 如果正在检查认证状态，显示加载指示器
   if (isCheckingAuth) {
     return (
-      <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: '#FFFBF8' }}>
-        <ActivityIndicator size="large" color="#FC9B33" />
+      <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: c.bgCream }}>
+        <ActivityIndicator size="large" color={c.primary} />
       </View>
     );
   }
@@ -58,20 +60,20 @@ export default function TabsLayout() {
     <Tabs 
       screenOptions={{ 
         headerShown: false,
-        tabBarActiveTintColor: '#F28F26',
-        tabBarInactiveTintColor: '#200E32',
+        tabBarActiveTintColor: c.primary,
+        tabBarInactiveTintColor: c.textMuted,
         tabBarStyle: {
-          backgroundColor: '#FFFBF8',
+          backgroundColor: c.bgCream,
           borderTopWidth: 1,
-          borderTopColor: 'rgba(0, 0, 0, 0.05)',
+          borderTopColor: c.border,
           height: 60,
           paddingBottom: 8,
-          paddingTop: 1,
+          paddingTop: s.bottomNavPaddingTop,
         },
         tabBarLabelStyle: {
-          fontSize: 10,
-          fontFamily: 'DM Sans',
-          fontWeight: '500',
+          fontSize: t.fontSize.tabLabel,
+          fontWeight: t.fontWeight.bold,
+          letterSpacing: 1,
         }
       }}
     >
